@@ -1,8 +1,16 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    await windowManager.ensureInitialized();
+    await windowManager.setSize(const Size(1024, 768));
+    await windowManager.setAlignment(Alignment.center);
+    await windowManager.show();
+  }
   runApp(const PerfettoRecorderApp());
 }
 
