@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'recorder.dart';
 import 'converter.dart';
+import 'callstack.dart';
 import 'about.dart';
 
 Future<void> main() async {
@@ -46,6 +47,7 @@ class _MainScreenState extends State<MainScreen> {
   // Define the pages for each section
   final List<Widget> _pages = const [
     RecorderScreen(),
+    CallStackScreen(),
     TraceConverterScreen(),
     AboutScreen(),
   ];
@@ -69,6 +71,11 @@ class _MainScreenState extends State<MainScreen> {
                 icon: Icon(Icons.fiber_manual_record_outlined),
                 selectedIcon: Icon(Icons.fiber_manual_record),
                 label: Text('Record'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.stacked_bar_chart_outlined),
+                selectedIcon: Icon(Icons.stacked_bar_chart),
+                label: Text('Call Stack'),
               ),
               NavigationRailDestination(
                 icon: Icon(Icons.transform_outlined),

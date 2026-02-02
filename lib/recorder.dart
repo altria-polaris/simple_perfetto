@@ -12,21 +12,21 @@ class RecorderScreen extends StatefulWidget {
 
 class _RecorderScreenState extends State<RecorderScreen> {
   double _durationMs = 10000;
-  double _bufferSizeMb = 64;
+  double _bufferSizeMBIndex = 6;  // power of two index
 
   // Duration steps for the slider
   final List<int> _durationSteps = [
-    10000, 15000, 30000, 60000,
-    180000, 300000, 600000, 900000,
-    1800000, 3600000
+       10000,   15000,   30000,   60000,
+      180000,  300000,  600000,  900000,
+     1800000, 2700000, 3600000
   ];
 
   String _formatDuration(int ms) {
     final duration = Duration(milliseconds: ms);
-    final h = duration.inHours;
-    final m = duration.inMinutes.remainder(60);
-    final s = duration.inSeconds.remainder(60);
-    return '${h}h ${m}m ${s}s';
+    final m = duration.inMinutes.toString().padLeft(2, '0');
+    final s = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+
+    return '$m:$s  m:s';
   }
 
   // Text Controllers
@@ -45,14 +45,16 @@ class _RecorderScreenState extends State<RecorderScreen> {
     final random = Random();
     final hex = random.nextInt(0x10000).toRadixString(16).toLowerCase().padLeft(4, '0');
     String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final fileName = '${now.year}-${twoDigits(now.month)}-${twoDigits(now.day)}_${twoDigits(now.hour)}_${twoDigits(now.minute)}_$hex.pftrace';
+    final fileName = '${now.year}-${twoDigits(now.month)}-${twoDigits(now.day)}_${twoDigits(now.hour)}-${twoDigits(now.minute)}_$hex.pftrace';
     _outputFileController.text = fileName;
   }
 
   // Process State promt
   bool _isRecording = false;
+  bool _userStopped = false;
   String _statusMessage = 'Ready to record.';
   Process? _recordingProcess;
+  HttpServer? _server;
 
   // Update Status Message
   void _updateStatus(String message) {
@@ -64,7 +66,7 @@ class _RecorderScreenState extends State<RecorderScreen> {
   // Config Generator
   String _generateConfig() {
     final duration = _durationMs.toInt();
-    final bufferSizeKb = _bufferSizeMb.toInt() * 1024;
+    final bufferSizeKb = pow(2, _bufferSizeMBIndex).toInt() * 1024;
     final categories = _categoriesController.text.trim().split(' ').where((s) => s.isNotEmpty).toList();
 
     String atraceLines = categories.map((c) => '      atrace_categories: "$c"').join('\n');
@@ -101,6 +103,7 @@ data_sources: {
 
     setState(() {
       _isRecording = true;
+      _userStopped = false;
       _statusMessage = 'Starting Perfetto...';
     });
 
@@ -109,7 +112,7 @@ data_sources: {
 
     try {
       _recordingProcess = await Process.start(
-        'adb', ['shell', 'perfetto', '-c', '-', '--txt', '-o', '/data/misc/perfetto-traces/$outputFile'],
+        'adb', ['shell', 'perfetto', '-c', '-', '--txt', '-o', '"/data/misc/perfetto-traces/$outputFile"'],
       );
 
       // Write config to stdin
@@ -122,7 +125,7 @@ data_sources: {
       // Wait for process to complete
       final exitCode = await _recordingProcess!.exitCode;
       
-      if (exitCode == 0) {
+      if (exitCode == 0 || _userStopped) {
         _updateStatus('Recording finished. Pulling trace...');
         await _pullTraceFile(outputFile);
         if (_autoGenerateFilename) {
@@ -149,8 +152,9 @@ data_sources: {
   // Manual Stop Recording
   Future<void> _stopRecording() async {
     if (_recordingProcess != null) {
+      _userStopped = true;
       _updateStatus('Stopping manually...');
-      _recordingProcess!.kill(ProcessSignal.sigterm);
+      await Process.run('adb', ['shell', 'killall', '-2', 'perfetto']);
     }
   }
 
@@ -168,170 +172,260 @@ data_sources: {
     }
   }
 
+  Future<void> _openTraceInBrowser() async {
+    final fileName = _outputFileController.text;
+    final filePath = '${Directory.current.path}\\$fileName';
+
+    if (!File(filePath).existsSync()) {
+      _updateStatus('File not found: $fileName');
+      return;
+    }
+
+    // Close existing server
+    await _server?.close(force: true);
+
+    try {
+      _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 9001);
+      _server!.listen((HttpRequest request) async {
+        request.response.headers.add('Access-Control-Allow-Origin', 'https://ui.perfetto.dev');
+        final encodedName = Uri.encodeComponent(fileName);
+        if (request.uri.path == '/$encodedName') {
+          final file = File(filePath);
+          await file.openRead().pipe(request.response);
+        } else {
+          request.response.statusCode = HttpStatus.notFound;
+          request.response.close();
+        }
+      });
+
+      final encodedName = Uri.encodeComponent(fileName);
+      final url = 'https://ui.perfetto.dev/#!/?url=http://127.0.0.1:9001/$encodedName&referrer=record_android_trace';
+
+      Process.run('cmd', ['/c', 'start', url]);
+      _updateStatus('Serving trace on port 9001...');
+    } catch (e) {
+      _updateStatus('Error starting server: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _server?.close(force: true);
+    _categoriesController.dispose();
+    _outputFileController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Simple Perfetto Recorder'),
-        actions: [
-          if (_isRecording)
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: IconButton(
-                icon: const Icon(Icons.stop_circle, color: Colors.redAccent, size: 32),
-                onPressed: _stopRecording,
-                tooltip: 'Stop Recording Now',
-              ),
-            )
-        ],
       ),
-      body: Center(
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Time Slider
-              _buildSectionTitle('Recording Duration'),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                   const Icon(Icons.timer, color: Colors.white70),
-                   const SizedBox(width: 10),
-                   Expanded(
-                     child: Slider(
-                      value: _durationSteps.indexOf(_durationMs.toInt()).toDouble(),
-                      min: 0,
-                      max: (_durationSteps.length - 1).toDouble(),
-                      divisions: _durationSteps.length - 1,
-                      label: _formatDuration(_durationMs.toInt()),
-                      onChanged: _isRecording ? null : (v) => setState(() => _durationMs = _durationSteps[v.toInt()].toDouble()),
-                                     ),
-                   ),
-                   SizedBox(
-                     width: 100,
-                     child: Text(
-                       _formatDuration(_durationMs.toInt()),
-                       textAlign: TextAlign.end,
-                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                     ),
-                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Buffer Size Slider
-              _buildSectionTitle('Ring Buffer Size'),
-              Row(
-                children: [
-                   const Icon(Icons.memory, color: Colors.white70),
-                   const SizedBox(width: 10),
-                   Expanded(
-                     child: Slider(
-                      value: _bufferSizeMb,
-                      min: 32,
-                      max: 1024, // max 1024 MB
-                      divisions: 63,
-                      label: '${_bufferSizeMb.round()} MB',
-                      onChanged: _isRecording ? null : (v) => setState(() => _bufferSizeMb = v),
-                                     ),
-                   ),
-                   SizedBox(
-                     width: 80,
-                     child: Text(
-                       '${_bufferSizeMb.toInt()} MB', 
-                       textAlign: TextAlign.end,
-                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                     ),
-                   ),
-                ],
-              ),
-              
-              const SizedBox(height: 20),
-              const Divider(),
-              const SizedBox(height: 10),
-
-              // Categories Inputs
-              TextField(
-                controller: _categoriesController,
-                textAlignVertical: TextAlignVertical.top,
-                decoration: const InputDecoration(
-                  labelText: 'Atrace Categories',
-                  alignLabelWithHint: true,
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.category),
-                  isDense: true,
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Output Path
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _outputFileController,
-                      decoration: const InputDecoration(
-                        labelText: 'Output Trace File',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.save_alt),
-                        isDense: true,
+                  // Time & Buffer Sliders Row
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionTitle('Recording Duration'),
+                            Row(
+                              children: [
+                                const Icon(Icons.timer, color: Colors.white70),
+                                Expanded(
+                                  child: Slider(
+                                    value: _durationSteps.indexOf(_durationMs.toInt()).toDouble(),
+                                    min: 0,
+                                    max: (_durationSteps.length - 1).toDouble(),
+                                    divisions: _durationSteps.length - 1,
+                                    label: _formatDuration(_durationMs.toInt()),
+                                    onChanged: _isRecording ? null : (v) => setState(() => _durationMs = _durationSteps[v.toInt()].toDouble()),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 90,
+                                  child: Text(
+                                    _formatDuration(_durationMs.toInt()),
+                                    textAlign: TextAlign.end,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 24),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionTitle('Ring Buffer Size'),
+                            Row(
+                              children: [
+                                const Icon(Icons.memory, color: Colors.white70),
+                                Expanded(
+                                  child: Slider(
+                                    value: _bufferSizeMBIndex,
+                                    min: 5,
+                                    max: 12,
+                                    divisions: 7,
+                                    label: '${pow(2, _bufferSizeMBIndex).toInt()} MB',
+                                    onChanged: _isRecording ? null : (v) => setState(() => _bufferSizeMBIndex = v),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 80,
+                                  child: Text(
+                                    '${pow(2, _bufferSizeMBIndex).toInt()} MB',
+                                    textAlign: TextAlign.end,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+                  const Divider(),
+                  const SizedBox(height: 8),
+
+                  // Categories Inputs
+                  TextField(
+                    controller: _categoriesController,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: const InputDecoration(
+                      labelText: 'Atrace Categories',
+                      alignLabelWithHint: true,
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.category),
+                      isDense: true,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Checkbox(value: _autoGenerateFilename, onChanged: (v) => setState(() => _autoGenerateFilename = v ?? true)),
-                  const Text('Random Filename'),
+                  const SizedBox(height: 12),
+
+                  // Output Path
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _outputFileController,
+                          decoration: const InputDecoration(
+                            labelText: 'Output Trace File',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.save_alt),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Checkbox(value: _autoGenerateFilename, onChanged: (v) => setState(() => _autoGenerateFilename = v ?? true)),
+                      const Text('random name'),
+                    ],
+                  ),
                 ],
               ),
-
-              const Spacer(), // Push to bottom
-
-              // Main Record Button
-              SizedBox(
-                height: 56,
-                child: ElevatedButton.icon(
-                  icon: _isRecording 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
-                      : const Icon(Icons.fiber_manual_record),
-                  label: Text(
-                    _isRecording ? 'RECORDING IN PROGRESS...' : 'START RECORDING',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+          
+          // Bottom Fixed Section
+          Container(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Main Record Button
+                SizedBox(
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    icon: _isRecording
+                        ? const Icon(Icons.stop)
+                        : const Icon(Icons.fiber_manual_record),
+                    label: Text(
+                      _isRecording ? 'STOP RECORDING' : 'START RECORDING',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isRecording ? Colors.redAccent : Colors.blueAccent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _isRecording ? _stopRecording : _startRecording,
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isRecording ? Colors.grey.shade800 : Colors.blueAccent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: _isRecording ? null : _startRecording,
                 ),
-              ),
-              
-              // Bottom Status Bar
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                decoration: BoxDecoration(
-                  color: Colors.black26,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white10),
-                ),
-                child: Row(
+
+                const SizedBox(height: 12),
+
+                // Action Buttons
+                Row(
                   children: [
-                    const Icon(Icons.info_outline, size: 16, color: Colors.grey),
-                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        _statusMessage,
-                        style: const TextStyle(fontFamily: 'monospace', color: Colors.white70),
-                        overflow: TextOverflow.ellipsis,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.folder_open),
+                        label: const Text('Open Explorer'),
+                        onPressed: () {
+                          final filePath = '${Directory.current.path}\\${_outputFileController.text}';
+                          if (File(filePath).existsSync()) {
+                            Process.run('explorer.exe', ['/select,', filePath]);
+                          } else {
+                            Process.run('explorer.exe', [Directory.current.path]);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.open_in_browser),
+                        label: const Text('Open Perfetto'),
+                        onPressed: _openTraceInBrowser,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 12),
+
+                // Bottom Status Bar
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black26,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _statusMessage,
+                          style: const TextStyle(fontFamily: 'monospace', color: Colors.white70),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
