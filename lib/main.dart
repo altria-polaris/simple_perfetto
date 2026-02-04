@@ -58,34 +58,50 @@ class _MainScreenState extends State<MainScreen> {
       body: Row(
         children: [
           // Left side navigation rail
-          NavigationRail(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (int index) {
-              setState(() {
-                _selectedIndex = index;
-              });
-            },
-            labelType: NavigationRailLabelType.all,
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.fiber_manual_record_outlined),
-                selectedIcon: Icon(Icons.fiber_manual_record),
-                label: Text('Record'),
+          Column(
+            children: [
+              Expanded(
+                child: NavigationRail(
+                  selectedIndex: _selectedIndex < 3 ? _selectedIndex : null,
+                  onDestinationSelected: (int index) {
+                    setState(() {
+                      _selectedIndex = index;
+                    });
+                  },
+                  labelType: NavigationRailLabelType.all,
+                  destinations: const [
+                    NavigationRailDestination(
+                      icon: Icon(Icons.fiber_manual_record_outlined),
+                      selectedIcon: Icon(Icons.fiber_manual_record),
+                      label: Text('Record'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.stacked_bar_chart_outlined),
+                      selectedIcon: Icon(Icons.stacked_bar_chart),
+                      label: Text('Call Stack'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.transform_outlined),
+                      selectedIcon: Icon(Icons.transform),
+                      label: Text('Convert'),
+                    ),
+                  ],
+                ),
               ),
-              NavigationRailDestination(
-                icon: Icon(Icons.stacked_bar_chart_outlined),
-                selectedIcon: Icon(Icons.stacked_bar_chart),
-                label: Text('Call Stack'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.transform_outlined),
-                selectedIcon: Icon(Icons.transform),
-                label: Text('Convert'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: Text('About'),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      isSelected: _selectedIndex == 3,
+                      icon: const Icon(Icons.person_outline),
+                      selectedIcon: const Icon(Icons.person),
+                      onPressed: () => setState(() => _selectedIndex = 3),
+                    ),
+                    const Text('About', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
               ),
             ],
           ),

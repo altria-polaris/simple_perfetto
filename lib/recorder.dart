@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -12,7 +13,7 @@ class RecorderScreen extends StatefulWidget {
 
 class _RecorderScreenState extends State<RecorderScreen> {
   double _durationMs = 10000;
-  double _bufferSizeMBIndex = 6;  // power of two index
+  double _bufferSizeMbExponent = 6;  // buffer size exponent for power of two
 
   // Duration steps for the slider
   final List<int> _durationSteps = [
@@ -21,12 +22,44 @@ class _RecorderScreenState extends State<RecorderScreen> {
      1800000, 2700000, 3600000
   ];
 
+  final List<Map<String, dynamic>> _atracePresets = [
+    {
+      'label': 'Basic',
+      'icon': Icons.phone_android,
+      'tags': 'gfx input view wm am',
+    },
+    {
+      'label': 'Camera',
+      'icon': Icons.camera_alt,
+      'tags': 'camera hal video ion gfx sched freq idle',
+    },
+    {
+      'label': 'Graphic',
+      'icon': Icons.videogame_asset,
+      'tags': 'gfx sched freq idle',
+    },
+    {
+      'label': 'Kernel',
+      'icon': Icons.developer_board,
+      'tags': 'sched freq idle irq workq disk sync',
+    },
+  ];
+
   String _formatDuration(int ms) {
+    final duration = Duration(milliseconds: ms);
+    final mInt = duration.inMinutes;
+    final m = mInt.toString().padLeft(2, '0');
+    final s = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+
+    return (mInt > 0) ? '$m:$s\tm:s' : '$s\tsec';  
+  }
+
+  String _formatTimer(int ms) {
     final duration = Duration(milliseconds: ms);
     final m = duration.inMinutes.toString().padLeft(2, '0');
     final s = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-
-    return '$m:$s  m:s';
+    final ds = (duration.inMilliseconds % 1000 ~/ 100);
+    return '$m:$s.$ds';
   }
 
   // Text Controllers
@@ -38,6 +71,10 @@ class _RecorderScreenState extends State<RecorderScreen> {
   void initState() {
     super.initState();
     _generateNewFilename();
+    // 監聽文字輸入框的變化，以便即時更新 Chip 的選取狀態
+    _categoriesController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   void _generateNewFilename() {
@@ -49,12 +86,45 @@ class _RecorderScreenState extends State<RecorderScreen> {
     _outputFileController.text = fileName;
   }
 
+  // Toggle Preset Tags
+  void _togglePreset(String tags, bool selected) {
+    final currentTags = _categoriesController.text.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
+    final presetTags = tags.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
+
+    if (selected) {
+      currentTags.addAll(presetTags); // accumulate tags
+    } else {
+      final tagsToKeep = <String>{};
+      for (final preset in _atracePresets) {
+        final pTagsStr = preset['tags'] as String;
+        if (pTagsStr == tags) continue; // skip itself
+
+        final pTags = pTagsStr.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
+        // Check if this preset is currently satisfied by the text field (before removal)
+        if (pTags.isNotEmpty && currentTags.containsAll(pTags)) {
+          tagsToKeep.addAll(pTags);
+        }
+      }
+      currentTags.removeAll(presetTags.difference(tagsToKeep));
+    }
+    _categoriesController.text = currentTags.join(' ');
+  }
+
+  // Check if preset is selected
+  bool _isPresetSelected(String tags) {
+    final currentTags = _categoriesController.text.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
+    final presetTags = tags.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
+    return presetTags.isNotEmpty && currentTags.containsAll(presetTags);
+  }
+
   // Process State promt
   bool _isRecording = false;
   bool _userStopped = false;
   String _statusMessage = 'Ready to record.';
   Process? _recordingProcess;
   HttpServer? _server;
+  Timer? _timer;
+  int _elapsedMs = 0;
 
   // Update Status Message
   void _updateStatus(String message) {
@@ -66,7 +136,7 @@ class _RecorderScreenState extends State<RecorderScreen> {
   // Config Generator
   String _generateConfig() {
     final duration = _durationMs.toInt();
-    final bufferSizeKb = pow(2, _bufferSizeMBIndex).toInt() * 1024;
+    final bufferSizeKb = pow(2, _bufferSizeMbExponent).toInt() * 1024;
     final categories = _categoriesController.text.trim().split(' ').where((s) => s.isNotEmpty).toList();
 
     String atraceLines = categories.map((c) => '      atrace_categories: "$c"').join('\n');
@@ -120,7 +190,17 @@ data_sources: {
       await _recordingProcess!.stdin.flush();
       await _recordingProcess!.stdin.close();
 
-      _updateStatus('Recording in progress... (${(_durationMs/1000).toStringAsFixed(1)}s)');
+      _updateStatus('Recording in progress...');
+      
+      // Start Timer
+      _elapsedMs = 0;
+      _timer?.cancel();
+      _timer = Timer.periodic(const Duration(milliseconds: 100), (t) {
+        setState(() {
+          _elapsedMs += 100;
+          if (_elapsedMs >= _durationMs) _elapsedMs = _durationMs.toInt();
+        });
+      });
 
       // Wait for process to complete
       final exitCode = await _recordingProcess!.exitCode;
@@ -144,6 +224,7 @@ data_sources: {
         setState(() {
           _isRecording = false;
           _recordingProcess = null;
+          _timer?.cancel();
         });
       }
     }
@@ -210,6 +291,7 @@ data_sources: {
 
   @override
   void dispose() {
+    _timer?.cancel();
     _server?.close(force: true);
     _categoriesController.dispose();
     _outputFileController.dispose();
@@ -224,130 +306,56 @@ data_sources: {
       ),
       body: Column(
         children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Time & Buffer Sliders Row
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionTitle('Recording Duration'),
-                            Row(
-                              children: [
-                                const Icon(Icons.timer, color: Colors.white70),
-                                Expanded(
-                                  child: Slider(
-                                    value: _durationSteps.indexOf(_durationMs.toInt()).toDouble(),
-                                    min: 0,
-                                    max: (_durationSteps.length - 1).toDouble(),
-                                    divisions: _durationSteps.length - 1,
-                                    label: _formatDuration(_durationMs.toInt()),
-                                    onChanged: _isRecording ? null : (v) => setState(() => _durationMs = _durationSteps[v.toInt()].toDouble()),
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 90,
-                                  child: Text(
-                                    _formatDuration(_durationMs.toInt()),
-                                    textAlign: TextAlign.end,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionTitle('Ring Buffer Size'),
-                            Row(
-                              children: [
-                                const Icon(Icons.memory, color: Colors.white70),
-                                Expanded(
-                                  child: Slider(
-                                    value: _bufferSizeMBIndex,
-                                    min: 5,
-                                    max: 12,
-                                    divisions: 7,
-                                    label: '${pow(2, _bufferSizeMBIndex).toInt()} MB',
-                                    onChanged: _isRecording ? null : (v) => setState(() => _bufferSizeMBIndex = v),
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 80,
-                                  child: Text(
-                                    '${pow(2, _bufferSizeMBIndex).toInt()} MB',
-                                    textAlign: TextAlign.end,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const SizedBox(height: 8),
-
-                  // Categories Inputs
-                  TextField(
-                    controller: _categoriesController,
-                    textAlignVertical: TextAlignVertical.top,
-                    decoration: const InputDecoration(
-                      labelText: 'Atrace Categories',
-                      alignLabelWithHint: true,
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.category),
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Output Path
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _outputFileController,
-                          decoration: const InputDecoration(
-                            labelText: 'Output Trace File',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.save_alt),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Checkbox(value: _autoGenerateFilename, onChanged: (v) => setState(() => _autoGenerateFilename = v ?? true)),
-                      const Text('random name'),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Bottom Fixed Section
+          // Top Section: Timer & Controls
           Container(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            padding: const EdgeInsets.all(8),
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Timer Display
+                Center(
+                  child: Column(
+                    children: [
+                      Text(
+                        '${_formatTimer(_elapsedMs)} / ${_formatTimer(_durationMs.toInt())}',
+                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                      ),
+                      const SizedBox(height: 8),
+                      LinearProgressIndicator(
+                        value: _durationMs > 0 ? (_elapsedMs / _durationMs).clamp(0.0, 1.0) : 0,
+                        minHeight: 8,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Output Path
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _outputFileController,
+                        decoration: const InputDecoration(
+                          labelText: 'Output Trace File',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.save_alt),
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Checkbox(value: _autoGenerateFilename, onChanged: (v) => setState(() => _autoGenerateFilename = v ?? true)),
+                        const Text('random', style: TextStyle(fontSize: 10)),
+                      ],
+                    ),
+                  ],
+                ),
                 // Main Record Button
                 SizedBox(
                   height: 56,
@@ -367,9 +375,7 @@ data_sources: {
                     onPressed: _isRecording ? _stopRecording : _startRecording,
                   ),
                 ),
-
-                const SizedBox(height: 12),
-
+                const SizedBox(height: 16),
                 // Action Buttons
                 Row(
                   children: [
@@ -397,32 +403,155 @@ data_sources: {
                     ),
                   ],
                 ),
+              ],
+            ),
+          ),
 
-                const SizedBox(height: 12),
+          const Divider(height: 1),
 
-                // Bottom Status Bar
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.black26,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white10),
-                  ),
-                  child: Row(
+          // Bottom Section: Settings (Scrollable)
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Sliders
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.info_outline, size: 16, color: Colors.grey),
-                      const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
-                          _statusMessage,
-                          style: const TextStyle(fontFamily: 'monospace', color: Colors.white70),
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionTitle('Recording Duration'),
+                            Row(
+                              children: [
+                                const Icon(Icons.timer, color: Colors.white70),
+                                Expanded(
+                                  child: Slider(
+                                    value: _durationSteps.indexOf(_durationMs.toInt()).toDouble(),
+                                    min: 0,
+                                    max: (_durationSteps.length - 1).toDouble(),
+                                    divisions: _durationSteps.length - 1,
+                                    label: _formatDuration(_durationMs.toInt()),
+                                    onChanged: _isRecording ? null : (v) => setState(() => _durationMs = _durationSteps[v.toInt()].toDouble()),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 90,
+                                  child: Text(
+                                    _formatDuration(_durationMs.toInt()),
+                                    textAlign: TextAlign.end,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 24),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSectionTitle('Ring Buffer Size'),
+                            Row(
+                              children: [
+                                const Icon(Icons.memory, color: Colors.white70),
+                                Expanded(
+                                  child: Slider(
+                                    value: _bufferSizeMbExponent,
+                                    min: 5,
+                                    max: 12,
+                                    divisions: 7,
+                                    label: '${pow(2, _bufferSizeMbExponent).toInt()} MB',
+                                    onChanged: _isRecording ? null : (v) => setState(() => _bufferSizeMbExponent = v),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 80,
+                                  child: Text(
+                                    '${pow(2, _bufferSizeMbExponent).toInt()} MB',
+                                    textAlign: TextAlign.end,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 8),
+                  //Quick Presets
+                  _buildSectionTitle('Quick Presets'),
+                  Theme(
+                    data: Theme.of(context).copyWith(
+                      splashFactory: NoSplash.splashFactory,
+                      highlightColor: Colors.transparent,
+                    ),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _atracePresets.map((p) {
+                        final tags = p['tags'] as String;
+                        final isSelected = _isPresetSelected(tags);
+                        return FilterChip(
+                          showCheckmark: false,
+                          avatar: Icon(p['icon'] as IconData, size: 16),
+                          label: Text(p['label'] as String),
+                          selected: isSelected,
+                          onSelected: (v) => _togglePreset(tags, v),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Categories Inputs
+                  TextField(
+                    controller: _categoriesController,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: const InputDecoration(
+                      labelText: 'Additional Categories',
+                      alignLabelWithHint: true,
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.category),
+                      isDense: true,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Bottom Fixed Section (Status Bar Only)
+          Container(
+            padding: const EdgeInsets.all(24),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _statusMessage,
+                      style: const TextStyle(fontFamily: 'monospace', color: Colors.white70),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
