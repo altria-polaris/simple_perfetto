@@ -67,11 +67,44 @@ class _RecorderScreenState extends State<RecorderScreen> {
   final TextEditingController _outputFileController = TextEditingController();
   bool _autoGenerateFilename = true;
 
+  // ADB Devices
+  List<String> _adbDevices = [];
+  String? _selectedDevice;
+
+  Future<void> _refreshAdbDevices() async {
+    try {
+      final result = await Process.run('adb', ['devices']);
+      if (result.exitCode == 0) {
+        final lines = LineSplitter.split(result.stdout as String).toList();
+        final devices = <String>[];
+        // Skip first line "List of devices attached"
+        for (var i = 1; i < lines.length; i++) {
+          final line = lines[i].trim();
+          if (line.isNotEmpty) {
+            final parts = line.split(RegExp(r'\s+'));
+            if (parts.length >= 2 && parts[1] == 'device') {
+              devices.add(parts[0]);
+            }
+          }
+        }
+        setState(() {
+          _adbDevices = devices;
+          if (_selectedDevice == null || !_adbDevices.contains(_selectedDevice)) {
+            _selectedDevice = _adbDevices.isNotEmpty ? _adbDevices.first : null;
+          }
+        });
+      }
+    } catch (e) {
+      _updateStatus('Error getting devices: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _generateNewFilename();
-    // 監聽文字輸入框的變化，以便即時更新 Chip 的選取狀態
+    _refreshAdbDevices();
+    // Listen to category text changes to update presets
     _categoriesController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -175,14 +208,18 @@ data_sources: {
       _isRecording = true;
       _userStopped = false;
       _statusMessage = 'Starting Perfetto...';
+      if (_autoGenerateFilename) {
+        _generateNewFilename();
+      }
     });
 
     final config = _generateConfig();
     final outputFile = _outputFileController.text;
 
+    final deviceArgs = _selectedDevice != null ? ['-s', _selectedDevice!] : [];
     try {
       _recordingProcess = await Process.start(
-        'adb', ['shell', 'perfetto', '-c', '-', '--txt', '-o', '"/data/misc/perfetto-traces/$outputFile"'],
+        'adb', [...deviceArgs, 'shell', 'perfetto', '-c', '-', '--txt', '-o', '"/data/misc/perfetto-traces/$outputFile"'],
       );
 
       // Write config to stdin
@@ -208,11 +245,6 @@ data_sources: {
       if (exitCode == 0 || _userStopped) {
         _updateStatus('Recording finished. Pulling trace...');
         await _pullTraceFile(outputFile);
-        if (_autoGenerateFilename) {
-          setState(() {
-            _generateNewFilename();
-          });
-        }
       } else {
         _updateStatus('Error: Perfetto exited with code $exitCode');
       }
@@ -235,14 +267,16 @@ data_sources: {
     if (_recordingProcess != null) {
       _userStopped = true;
       _updateStatus('Stopping manually...');
-      await Process.run('adb', ['shell', 'killall', '-2', 'perfetto']);
+      final deviceArgs = _selectedDevice != null ? ['-s', _selectedDevice!] : [];
+      await Process.run('adb', [...deviceArgs, 'shell', 'killall', '-2', 'perfetto']);
     }
   }
 
   // Pull Trace File from Device
   Future<void> _pullTraceFile(String traceName) async {
     try {
-      final result = await Process.run('adb', ['pull', '/data/misc/perfetto-traces/$traceName', traceName]);
+      final deviceArgs = _selectedDevice != null ? ['-s', _selectedDevice!] : [];
+      final result = await Process.run('adb', [...deviceArgs, 'pull', '/data/misc/perfetto-traces/$traceName', traceName]);
       if (result.exitCode == 0) {
         _updateStatus('Success! Saved to $traceName');
       } else {
@@ -308,29 +342,83 @@ data_sources: {
         children: [
           // Top Section: Timer & Controls
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(16),
             color: Theme.of(context).colorScheme.surfaceContainerLow,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Timer Display
-                Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        '${_formatTimer(_elapsedMs)} / ${_formatTimer(_durationMs.toInt())}',
-                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                // Row: Timer and Record Button
+                Row(
+                  children: [
+                    // Timer
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        children: [
+                          Text(
+                            '${_formatTimer(_elapsedMs)} / ${_formatTimer(_durationMs.toInt())}',
+                            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                          ),
+                          const SizedBox(height: 8),
+                          LinearProgressIndicator(
+                            value: _durationMs > 0 ? (_elapsedMs / _durationMs).clamp(0.0, 1.0) : 0,
+                            minHeight: 8,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      LinearProgressIndicator(
-                        value: _durationMs > 0 ? (_elapsedMs / _durationMs).clamp(0.0, 1.0) : 0,
-                        minHeight: 8,
-                        borderRadius: BorderRadius.circular(4),
+                    ),
+                    const SizedBox(width: 24),
+                    // Record Button
+                    Expanded(
+                      flex: 3,
+                      child: SizedBox(
+                        height: 56,
+                        child: ElevatedButton.icon(
+
+                          label: Text(
+                            _isRecording ? 'STOP' : 'START RECORDING',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isRecording ? Colors.redAccent : Colors.blueAccent,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _isRecording ? _stopRecording : _startRecording,
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+
+                // Device Selector
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedDevice,
+                        decoration: const InputDecoration(
+                          labelText: 'Target Device',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.phone_android),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                        items: _adbDevices.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                        onChanged: (v) => setState(() => _selectedDevice = v),
+                        hint: const Text('No devices found'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.refresh),
+                      onPressed: _refreshAdbDevices,
+                      tooltip: 'Refresh Devices',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
 
                 // Output Path
                 Row(
@@ -356,26 +444,8 @@ data_sources: {
                     ),
                   ],
                 ),
-                // Main Record Button
-                SizedBox(
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    icon: _isRecording
-                        ? const Icon(Icons.stop)
-                        : const Icon(Icons.fiber_manual_record),
-                    label: Text(
-                      _isRecording ? 'STOP RECORDING' : 'START RECORDING',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isRecording ? Colors.redAccent : Colors.blueAccent,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: _isRecording ? _stopRecording : _startRecording,
-                  ),
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+
                 // Action Buttons
                 Row(
                   children: [
@@ -417,73 +487,81 @@ data_sources: {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Sliders
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionTitle('Recording Duration'),
-                            Row(
-                              children: [
-                                const Icon(Icons.timer, color: Colors.white70),
-                                Expanded(
-                                  child: Slider(
-                                    value: _durationSteps.indexOf(_durationMs.toInt()).toDouble(),
-                                    min: 0,
-                                    max: (_durationSteps.length - 1).toDouble(),
-                                    divisions: _durationSteps.length - 1,
-                                    label: _formatDuration(_durationMs.toInt()),
-                                    onChanged: _isRecording ? null : (v) => setState(() => _durationMs = _durationSteps[v.toInt()].toDouble()),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackShape: const RectangularSliderTrackShape(),
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionTitle('Recording Duration'),
+                              Row(
+                                children: [
+                                  const Icon(Icons.timer, color: Colors.white70),
+                                  Expanded(
+                                    child: Slider(
+                                      value: _durationSteps.indexOf(_durationMs.toInt()).toDouble(),
+                                      min: 0,
+                                      max: (_durationSteps.length - 1).toDouble(),
+                                      divisions: _durationSteps.length - 1,
+                                      label: _formatDuration(_durationMs.toInt()),
+                                      onChanged: _isRecording ? null : (v) => setState(() => _durationMs = _durationSteps[v.toInt()].toDouble()),
+                                    ),
                                   ),
-                                ),
-                                SizedBox(
-                                  width: 90,
-                                  child: Text(
-                                    _formatDuration(_durationMs.toInt()),
-                                    textAlign: TextAlign.end,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  SizedBox(
+                                    width: 80,
+                                    child: Text(
+                                      _formatDuration(_durationMs.toInt()),
+                                      textAlign: TextAlign.end,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSectionTitle('Ring Buffer Size'),
-                            Row(
-                              children: [
-                                const Icon(Icons.memory, color: Colors.white70),
-                                Expanded(
-                                  child: Slider(
-                                    value: _bufferSizeMbExponent,
-                                    min: 5,
-                                    max: 12,
-                                    divisions: 7,
-                                    label: '${pow(2, _bufferSizeMbExponent).toInt()} MB',
-                                    onChanged: _isRecording ? null : (v) => setState(() => _bufferSizeMbExponent = v),
+                        const SizedBox(width: 24),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSectionTitle('Ring Buffer Size'),
+                              Row(
+                                children: [
+                                  const Icon(Icons.memory, color: Colors.white70),
+                                  Expanded(
+                                    child: Slider(
+                                      value: _bufferSizeMbExponent,
+                                      min: 5,
+                                      max: 11,
+                                      divisions: 6,
+                                      label: '${pow(2, _bufferSizeMbExponent).toInt()} MB',
+                                      onChanged: _isRecording ? null : (v) => setState(() => _bufferSizeMbExponent = v),
+                                    ),
                                   ),
-                                ),
-                                SizedBox(
-                                  width: 80,
-                                  child: Text(
-                                    '${pow(2, _bufferSizeMbExponent).toInt()} MB',
-                                    textAlign: TextAlign.end,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  SizedBox(
+                                    width: 70,
+                                    child: Text(
+                                      '${pow(2, _bufferSizeMbExponent).toInt()} MB',
+                                      textAlign: TextAlign.end,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
 
                   const SizedBox(height: 8),
