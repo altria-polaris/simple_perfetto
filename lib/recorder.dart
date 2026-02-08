@@ -13,13 +13,14 @@ class RecorderScreen extends StatefulWidget {
 
 class _RecorderScreenState extends State<RecorderScreen> {
   double _durationMs = 10000;
-  double _bufferSizeMbExponent = 6;  // buffer size exponent for power of two
+  final TextEditingController _bufferSizeController = TextEditingController();
+  bool _autoBufferSize = true;
 
   // Duration steps for the slider
   final List<int> _durationSteps = [
        10000,   15000,   30000,   60000,
       180000,  300000,  600000,  900000,
-     1800000, 2700000, 3600000
+     1800000, 3600000
   ];
 
   final List<Map<String, dynamic>> _atracePresets = [
@@ -63,8 +64,10 @@ class _RecorderScreenState extends State<RecorderScreen> {
   }
 
   // Text Controllers
-  final TextEditingController _categoriesController = TextEditingController(text: 'gfx view sched freq idle am wm',);
+  final TextEditingController _categoriesController = TextEditingController();
+  final TextEditingController _appNameController = TextEditingController();
   final TextEditingController _outputFileController = TextEditingController();
+  final ScrollController _activeCategoriesScrollController = ScrollController();
   bool _autoGenerateFilename = true;
 
   // ADB Devices
@@ -103,6 +106,7 @@ class _RecorderScreenState extends State<RecorderScreen> {
   void initState() {
     super.initState();
     _generateNewFilename();
+    _updateBufferSize();
     _refreshAdbDevices();
     // Listen to category text changes to update presets
     _categoriesController.addListener(() {
@@ -119,41 +123,51 @@ class _RecorderScreenState extends State<RecorderScreen> {
     _outputFileController.text = fileName;
   }
 
-  // Toggle Preset Tags
-  void _togglePreset(String tags, bool selected) {
-    final currentTags = _categoriesController.text.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
-    final presetTags = tags.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
-
-    if (selected) {
-      currentTags.addAll(presetTags); // accumulate tags
-    } else {
-      final tagsToKeep = <String>{};
-      for (final preset in _atracePresets) {
-        final pTagsStr = preset['tags'] as String;
-        if (pTagsStr == tags) continue; // skip itself
-
-        final pTags = pTagsStr.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
-        // Check if this preset is currently satisfied by the text field (before removal)
-        if (pTags.isNotEmpty && currentTags.containsAll(pTags)) {
-          tagsToKeep.addAll(pTags);
-        }
-      }
-      currentTags.removeAll(presetTags.difference(tagsToKeep));
+  void _updateBufferSize() {
+    if (_autoBufferSize) {
+      // Auto-calculate buffer size: ~10MB per second
+      int durationSec = _durationMs ~/ 1000;
+      int sizeMb = durationSec * 10;
+      if (sizeMb < 32) sizeMb = 32;
+      if (sizeMb > 2048) sizeMb = 2048;
+      _bufferSizeController.text = sizeMb.toString();
     }
-    _categoriesController.text = currentTags.join(' ');
+  }
+
+  // Selected Presets
+  final Set<String> _selectedPresetLabels = {'Basic'};
+
+  // Toggle Preset
+  void _togglePreset(String label, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedPresetLabels.add(label);
+      } else {
+        _selectedPresetLabels.remove(label);
+      }
+    });
   }
 
   // Check if preset is selected
-  bool _isPresetSelected(String tags) {
-    final currentTags = _categoriesController.text.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
-    final presetTags = tags.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
-    return presetTags.isNotEmpty && currentTags.containsAll(presetTags);
+  bool _isPresetSelected(String label) {
+    return _selectedPresetLabels.contains(label);
+  }
+
+  Set<String> _getAllCategories() {
+    final manualTags = _categoriesController.text.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
+    final presetTags = <String>{};
+    for (final preset in _atracePresets) {
+      if (_selectedPresetLabels.contains(preset['label'])) {
+        final tags = (preset['tags'] as String).trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty);
+        presetTags.addAll(tags);
+      }
+    }
+    return {...presetTags, ...manualTags};
   }
 
   // Process State promt
   bool _isRecording = false;
   bool _userStopped = false;
-  String _statusMessage = 'Ready to record.';
   Process? _recordingProcess;
   HttpServer? _server;
   Timer? _timer;
@@ -161,18 +175,27 @@ class _RecorderScreenState extends State<RecorderScreen> {
 
   // Update Status Message
   void _updateStatus(String message) {
-    setState(() {
-      _statusMessage = message;
-    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 5)),
+    );
   }
 
   // Config Generator
   String _generateConfig() {
     final duration = _durationMs.toInt();
-    final bufferSizeKb = pow(2, _bufferSizeMbExponent).toInt() * 1024;
-    final categories = _categoriesController.text.trim().split(' ').where((s) => s.isNotEmpty).toList();
+    int bufferSizeKb = 32 * 1024;
+    try {
+      bufferSizeKb = int.parse(_bufferSizeController.text) * 1024;
+    } catch (_) {}
+    final categories = _getAllCategories().toList();
+    final appName = _appNameController.text.trim();
 
     String atraceLines = categories.map((c) => '      atrace_categories: "$c"').join('\n');
+    if (appName.isNotEmpty) {
+      atraceLines += '\n      atrace_apps: "$appName"';
+    }
 
     return '''
 buffers: {
@@ -207,11 +230,11 @@ data_sources: {
     setState(() {
       _isRecording = true;
       _userStopped = false;
-      _statusMessage = 'Starting Perfetto...';
       if (_autoGenerateFilename) {
         _generateNewFilename();
       }
     });
+    _updateStatus('Starting Perfetto...');
 
     final config = _generateConfig();
     final outputFile = _outputFileController.text;
@@ -328,7 +351,10 @@ data_sources: {
     _timer?.cancel();
     _server?.close(force: true);
     _categoriesController.dispose();
+    _appNameController.dispose();
     _outputFileController.dispose();
+    _bufferSizeController.dispose();
+    _activeCategoriesScrollController.dispose();
     super.dispose();
   }
 
@@ -336,13 +362,42 @@ data_sources: {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        forceMaterialTransparency: true,
         title: const Text('Simple Perfetto Recorder'),
+        actions: [
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedDevice,
+              isDense: true,
+              menuMaxHeight: 300,
+              hint: const Text('No Device'),
+              selectedItemBuilder: (BuildContext context) {
+                return _adbDevices.map<Widget>((String item) {
+                  return Row(
+                    children: [
+                      const Icon(Icons.phone_android, size: 18),
+                      const SizedBox(width: 8),
+                      Text(item),
+                    ],
+                  );
+                }).toList();
+              },
+              items: _adbDevices.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+              onChanged: (v) => setState(() => _selectedDevice = v),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshAdbDevices,
+            tooltip: 'Refresh Devices',
+          ),
+        ],
       ),
       body: Column(
         children: [
           // Top Section: Timer & Controls
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             color: Theme.of(context).colorScheme.surfaceContainerLow,
             child: Column(
               children: [
@@ -351,16 +406,16 @@ data_sources: {
                   children: [
                     // Timer
                     Expanded(
-                      flex: 4,
+                      flex: 2,
                       child: Column(
                         children: [
                           Text(
-                            '${_formatTimer(_elapsedMs)} / ${_formatTimer(_durationMs.toInt())}',
+                            '${_formatTimer(_elapsedMs)} / ${_formatTimer(_durationMs.toInt())} m:s',
                             style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
                           ),
                           const SizedBox(height: 8),
                           LinearProgressIndicator(
-                            value: _durationMs > 0 ? (_elapsedMs / _durationMs).clamp(0.0, 1.0) : 0,
+                            value: (_durationMs > 0 && _isRecording)  ? (_elapsedMs / _durationMs).clamp(0.0, 1.0) : 0,
                             minHeight: 8,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -370,7 +425,7 @@ data_sources: {
                     const SizedBox(width: 24),
                     // Record Button
                     Expanded(
-                      flex: 3,
+                      flex: 1,
                       child: SizedBox(
                         height: 56,
                         child: ElevatedButton.icon(
@@ -392,57 +447,86 @@ data_sources: {
                 ),
                 const SizedBox(height: 16),
 
-                // Device Selector
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedDevice,
-                        decoration: const InputDecoration(
-                          labelText: 'Target Device',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.phone_android),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                // Settings Row: Duration & Buffer
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackShape: const RectangularSliderTrackShape(),
+                    trackHeight: 4,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.timer_outlined),
+                      const Text('  Max Duration', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(
+                        flex: 1,
+                        child: Slider(
+                          value: _durationSteps.indexOf(_durationMs.toInt()).toDouble(),
+                          min: 0,
+                          max: (_durationSteps.length - 1).toDouble(),
+                          divisions: _durationSteps.length - 1,
+                          label: _formatDuration(_durationMs.toInt()),
+                          onChanged: _isRecording ? null : (v) => setState(() {
+                            _durationMs = _durationSteps[v.toInt()].toDouble();
+                            _updateBufferSize();
+                          }),
                         ),
-                        items: _adbDevices.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
-                        onChanged: (v) => setState(() => _selectedDevice = v),
-                        hint: const Text('No devices found'),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: _refreshAdbDevices,
-                      tooltip: 'Refresh Devices',
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      const Icon(Icons.restore_outlined),
+                      const Text('  Buffer Size', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Expanded(
+                        flex: 1,
+                        child: TextField(
+                          controller: _bufferSizeController,
+                          readOnly: _autoBufferSize,
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.center,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                            suffixText: 'MB',
+                            suffixIcon: IconButton(
+                              iconSize: 16,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              icon: _autoBufferSize ? const Icon(Icons.lock) : const Icon(Icons.lock_open),
+                              onPressed: () {
+                                setState(() {
+                                  _autoBufferSize = !_autoBufferSize;
+                                  if (_autoBufferSize) _updateBufferSize();
+                                });
+                              },
+                              tooltip: _autoBufferSize ? 'Unlock to edit' : 'Lock to auto-calculate',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 12),
 
                 // Output Path
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _outputFileController,
-                        decoration: const InputDecoration(
-                          labelText: 'Output Trace File',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.save_alt),
-                          isDense: true,
-                        ),
-                      ),
+                TextField(
+                  controller: _outputFileController,
+                  readOnly: _autoGenerateFilename,
+                  decoration: InputDecoration(
+                    labelText: 'Output Trace File',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: _autoGenerateFilename ? const Icon(Icons.file_open) : const Icon(Icons.edit_document),
+                    suffixIcon: IconButton(
+                      icon: _autoGenerateFilename ? const Icon(Icons.lock) : const Icon(Icons.lock_open),
+                      onPressed: () {
+                        setState(() {
+                          _autoGenerateFilename = !_autoGenerateFilename;
+                        });
+                      },
+                      tooltip: _autoGenerateFilename ? 'Unlock to edit' : 'Lock to auto-generate',
                     ),
-                    const SizedBox(width: 8),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(value: _autoGenerateFilename, onChanged: (v) => setState(() => _autoGenerateFilename = v ?? true)),
-                        const Text('random', style: TextStyle(fontSize: 10)),
-                      ],
-                    ),
-                  ],
+                    isDense: true,
+                  ),
                 ),
                 const SizedBox(height: 12),
 
@@ -463,7 +547,7 @@ data_sources: {
                         },
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 20),
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.open_in_browser),
@@ -481,90 +565,11 @@ data_sources: {
 
           // Bottom Section: Settings (Scrollable)
           Expanded(
-            child: SingleChildScrollView(
+            child: Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Sliders
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackShape: const RectangularSliderTrackShape(),
-                      trackHeight: 4,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildSectionTitle('Recording Duration'),
-                              Row(
-                                children: [
-                                  const Icon(Icons.timer, color: Colors.white70),
-                                  Expanded(
-                                    child: Slider(
-                                      value: _durationSteps.indexOf(_durationMs.toInt()).toDouble(),
-                                      min: 0,
-                                      max: (_durationSteps.length - 1).toDouble(),
-                                      divisions: _durationSteps.length - 1,
-                                      label: _formatDuration(_durationMs.toInt()),
-                                      onChanged: _isRecording ? null : (v) => setState(() => _durationMs = _durationSteps[v.toInt()].toDouble()),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 80,
-                                    child: Text(
-                                      _formatDuration(_durationMs.toInt()),
-                                      textAlign: TextAlign.end,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 24),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildSectionTitle('Ring Buffer Size'),
-                              Row(
-                                children: [
-                                  const Icon(Icons.memory, color: Colors.white70),
-                                  Expanded(
-                                    child: Slider(
-                                      value: _bufferSizeMbExponent,
-                                      min: 5,
-                                      max: 11,
-                                      divisions: 6,
-                                      label: '${pow(2, _bufferSizeMbExponent).toInt()} MB',
-                                      onChanged: _isRecording ? null : (v) => setState(() => _bufferSizeMbExponent = v),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: 70,
-                                    child: Text(
-                                      '${pow(2, _bufferSizeMbExponent).toInt()} MB',
-                                      textAlign: TextAlign.end,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
                   //Quick Presets
                   _buildSectionTitle('Quick Presets'),
                   Theme(
@@ -576,14 +581,14 @@ data_sources: {
                       spacing: 8,
                       runSpacing: 8,
                       children: _atracePresets.map((p) {
-                        final tags = p['tags'] as String;
-                        final isSelected = _isPresetSelected(tags);
+                        final label = p['label'] as String;
+                        final isSelected = _isPresetSelected(label);
                         return FilterChip(
                           showCheckmark: false,
                           avatar: Icon(p['icon'] as IconData, size: 16),
-                          label: Text(p['label'] as String),
+                          label: Text(label),
                           selected: isSelected,
-                          onSelected: (v) => _togglePreset(tags, v),
+                          onSelected: (v) => _togglePreset(label, v),
                         );
                       }).toList(),
                     ),
@@ -595,39 +600,65 @@ data_sources: {
                     controller: _categoriesController,
                     textAlignVertical: TextAlignVertical.top,
                     decoration: const InputDecoration(
-                      labelText: 'Additional Categories',
+                      labelText: 'Manual Categories',
                       alignLabelWithHint: true,
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.category),
                       isDense: true,
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Bottom Fixed Section (Status Bar Only)
-          Container(
-            padding: const EdgeInsets.all(24),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, size: 16, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _statusMessage,
-                      style: const TextStyle(fontFamily: 'monospace', color: Colors.white70),
-                      overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 12),
+
+                  // App Name Input
+                  TextField(
+                    controller: _appNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'App Name (atrace_apps)',
+                      hintText: 'e.g. com.example.app',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.apps),
+                      isDense: true,
                     ),
                   ),
+
+                  // Active Categories Display
+                  if (_getAllCategories().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildSectionTitle('Active Categories'),
+                    Expanded(
+                      child: Container(
+                        clipBehavior: Clip.hardEdge,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Theme.of(context).dividerColor),
+                        ),
+                        child: Scrollbar(
+                          controller: _activeCategoriesScrollController,
+                          thumbVisibility: true,
+                          child: GridView.extent(
+                            controller: _activeCategoriesScrollController,
+                            maxCrossAxisExtent: 120,
+                            padding: EdgeInsets.zero,
+                            mainAxisSpacing: 0,
+                            crossAxisSpacing: 0,
+                            childAspectRatio: 4,
+                            children: _getAllCategories().map((tag) => Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.5)),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                tag,
+                                style: const TextStyle(fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            )).toList(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
