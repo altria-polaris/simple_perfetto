@@ -5,6 +5,11 @@ import 'recorder.dart';
 import 'converter.dart';
 import 'callstack.dart';
 import 'about.dart';
+import 'settings.dart';
+
+// Global Theme Notifiers
+final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(ThemeMode.dark);
+final ValueNotifier<Color> colorSeedNotifier = ValueNotifier(Colors.blueGrey);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,14 +27,30 @@ class PerfettoRecorderApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Perfetto UI Recorder',
-      theme: ThemeData(
-        primarySwatch: Colors.blueGrey,
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
-      home: const MainScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeModeNotifier,
+      builder: (context, themeMode, _) {
+        return ValueListenableBuilder<Color>(
+          valueListenable: colorSeedNotifier,
+          builder: (context, colorSeed, _) {
+            return MaterialApp(
+              title: 'Perfetto UI Recorder',
+              theme: ThemeData(
+                colorSchemeSeed: colorSeed,
+                brightness: Brightness.light,
+                useMaterial3: true,
+              ),
+              darkTheme: ThemeData(
+                colorSchemeSeed: colorSeed,
+                brightness: Brightness.dark,
+                useMaterial3: true,
+              ),
+              themeMode: themeMode,
+              home: const MainScreen(),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -49,6 +70,7 @@ class _MainScreenState extends State<MainScreen> {
     RecorderScreen(),
     CallStackScreen(),
     TraceConverterScreen(),
+    SettingsScreen(),
     AboutScreen(),
   ];
 
@@ -95,9 +117,17 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     IconButton(
                       isSelected: _selectedIndex == 3,
+                      icon: const Icon(Icons.settings_outlined),
+                      selectedIcon: const Icon(Icons.settings),
+                      onPressed: () => setState(() => _selectedIndex = 3),
+                    ),
+                    const Text('Settings', style: TextStyle(fontSize: 12)),
+                    const SizedBox(height: 16),
+                    IconButton(
+                      isSelected: _selectedIndex == 4,
                       icon: const Icon(Icons.person_outline),
                       selectedIcon: const Icon(Icons.person),
-                      onPressed: () => setState(() => _selectedIndex = 3),
+                      onPressed: () => setState(() => _selectedIndex = 4),
                     ),
                     const Text('About', style: TextStyle(fontSize: 12)),
                   ],

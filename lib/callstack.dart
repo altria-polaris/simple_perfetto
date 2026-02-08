@@ -14,7 +14,7 @@ class CallStackScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.transform, size: 64, color: Colors.grey),
+            Icon(Icons.bar_chart, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text('Call Stack Recorder'),
           ],
