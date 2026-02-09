@@ -15,6 +15,7 @@ class _RecorderScreenState extends State<RecorderScreen> {
   double _durationMs = 10000;
   final TextEditingController _bufferSizeController = TextEditingController();
   bool _autoBufferSize = true;
+  bool _isCategoriesExpanded = true;
 
   // Duration steps for the slider
   final List<int> _durationSteps = [
@@ -67,7 +68,7 @@ class _RecorderScreenState extends State<RecorderScreen> {
   final TextEditingController _categoriesController = TextEditingController();
   final TextEditingController _appNameController = TextEditingController();
   final TextEditingController _outputFileController = TextEditingController();
-  final ScrollController _activeCategoriesScrollController = ScrollController();
+  final ScrollController _categoriesScrollController = ScrollController();
   bool _autoGenerateFilename = true;
 
   // ADB Devices
@@ -354,7 +355,7 @@ data_sources: {
     _appNameController.dispose();
     _outputFileController.dispose();
     _bufferSizeController.dispose();
-    _activeCategoriesScrollController.dispose();
+    _categoriesScrollController.dispose();
     super.dispose();
   }
 
@@ -411,7 +412,7 @@ data_sources: {
                         children: [
                           Text(
                             '${_formatTimer(_elapsedMs)} / ${_formatTimer(_durationMs.toInt())} m:s',
-                            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
                           ),
                           const SizedBox(height: 8),
                           LinearProgressIndicator(
@@ -427,7 +428,7 @@ data_sources: {
                     Expanded(
                       flex: 1,
                       child: SizedBox(
-                        height: 56,
+                        height: 48,
                         child: ElevatedButton.icon(
 
                           label: Text(
@@ -445,7 +446,7 @@ data_sources: {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
 
                 // Settings Row: Duration & Buffer
                 SliderTheme(
@@ -476,6 +477,7 @@ data_sources: {
                       const SizedBox(width: 12),
                       const Icon(Icons.restore_outlined),
                       const Text('  Buffer Size', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
                       Expanded(
                         flex: 1,
                         child: TextField(
@@ -506,7 +508,7 @@ data_sources: {
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Output Path
                 TextField(
@@ -528,7 +530,7 @@ data_sources: {
                     isDense: true,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Action Buttons
                 Row(
@@ -566,7 +568,7 @@ data_sources: {
           // Bottom Section: Settings (Scrollable)
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -593,27 +595,29 @@ data_sources: {
                       }).toList(),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
                   // Categories Inputs
                   TextField(
                     controller: _categoriesController,
                     textAlignVertical: TextAlignVertical.top,
+                    style: const TextStyle(fontSize: 12),
                     decoration: const InputDecoration(
-                      labelText: 'Manual Categories',
+                      labelText: 'Additional atrace/frace events',
                       alignLabelWithHint: true,
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.category),
                       isDense: true,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
                   // App Name Input
                   TextField(
                     controller: _appNameController,
+                    style: const TextStyle(fontSize: 12),
                     decoration: const InputDecoration(
-                      labelText: 'App Name (atrace_apps)',
+                      labelText: 'User process/package names',
                       hintText: 'e.g. com.example.app',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.apps),
@@ -623,41 +627,94 @@ data_sources: {
 
                   // Active Categories Display
                   if (_getAllCategories().isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _buildSectionTitle('Active Categories'),
-                    Expanded(
-                      child: Container(
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () => setState(() => _isCategoriesExpanded = !_isCategoriesExpanded),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Active Categories (${_getAllCategories().length})',
+                              style: const TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
+                            ),
+                            const Spacer(),
+                            Icon(_isCategoriesExpanded ? Icons.expand_less : Icons.expand_more, color: Colors.grey),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_isCategoriesExpanded)
+                      Container(
+                        width: double.infinity,
                         clipBehavior: Clip.hardEdge,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Theme.of(context).colorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: Theme.of(context).dividerColor),
                         ),
-                        child: Scrollbar(
-                          controller: _activeCategoriesScrollController,
-                          thumbVisibility: true,
-                          child: GridView.extent(
-                            controller: _activeCategoriesScrollController,
-                            maxCrossAxisExtent: 120,
-                            padding: EdgeInsets.zero,
-                            mainAxisSpacing: 0,
-                            crossAxisSpacing: 0,
-                            childAspectRatio: 4,
-                            children: _getAllCategories().map((tag) => Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.5)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Scrollbar(
+                              controller: _categoriesScrollController,
+                              thumbVisibility: true,
+                              child: SingleChildScrollView(
+                                controller: _categoriesScrollController,
+                                scrollDirection: Axis.horizontal,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Text('atrace', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        const SizedBox(width: 8),
+                                        ..._getAllCategories().map((tag) => Container(
+                                          margin: const EdgeInsets.only(right: 6),
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.surface,
+                                            border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.5)),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            tag,
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                        )),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Text('ftrace', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        const SizedBox(width: 8),
+                                        ...['sched/sched_switch', 'power/suspend_resume', 'ftrace/print'].map((tag) => Container(
+                                          margin: const EdgeInsets.only(right: 6),
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).colorScheme.surface,
+                                            border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.5)),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            tag,
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                        )),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                  ],
+                                ),
+                                
                               ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                tag,
-                                style: const TextStyle(fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            )).toList(),
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
                   ],
                 ],
               ),
