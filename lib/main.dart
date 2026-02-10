@@ -15,8 +15,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
-    await windowManager.setSize(const Size(800, 600));
+    await windowManager.setSize(const Size(600, 600));
     await windowManager.setAlignment(Alignment.center);
+    await windowManager.setResizable(false);
     await windowManager.show();
   }
   runApp(const PerfettoRecorderApp());

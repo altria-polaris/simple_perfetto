@@ -16,6 +16,7 @@ class _RecorderScreenState extends State<RecorderScreen> {
   final TextEditingController _bufferSizeController = TextEditingController();
   bool _autoBufferSize = true;
   bool _isCategoriesExpanded = true;
+  bool _isButtonLocked = false;
 
   // Duration steps for the slider
   final List<int> _durationSteps = [
@@ -174,12 +175,25 @@ class _RecorderScreenState extends State<RecorderScreen> {
   Timer? _timer;
   int _elapsedMs = 0;
 
+  void _lockButton() {
+    setState(() {
+      _isButtonLocked = true;
+    });
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _isButtonLocked = false;
+        });
+      }
+    });
+  }
+
   // Update Status Message
   void _updateStatus(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 5)),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2)),
     );
   }
 
@@ -228,6 +242,7 @@ data_sources: {
   Future<void> _startRecording() async {
     if (_isRecording) return;
 
+    _lockButton();
     setState(() {
       _isRecording = true;
       _userStopped = false;
@@ -288,6 +303,7 @@ data_sources: {
 
   // Manual Stop Recording
   Future<void> _stopRecording() async {
+    _lockButton();
     if (_recordingProcess != null) {
       _userStopped = true;
       _updateStatus('Stopping manually...');
@@ -299,10 +315,16 @@ data_sources: {
   // Pull Trace File from Device
   Future<void> _pullTraceFile(String traceName) async {
     try {
+      final tracesDir = Directory('${Directory.current.path}\\Traces');
+      if (!await tracesDir.exists()) {
+        await tracesDir.create(recursive: true);
+      }
+      final localPath = '${tracesDir.path}\\$traceName';
+
       final deviceArgs = _selectedDevice != null ? ['-s', _selectedDevice!] : [];
-      final result = await Process.run('adb', [...deviceArgs, 'pull', '/data/misc/perfetto-traces/$traceName', traceName]);
+      final result = await Process.run('adb', [...deviceArgs, 'pull', '/data/misc/perfetto-traces/$traceName', localPath]);
       if (result.exitCode == 0) {
-        _updateStatus('Success! Saved to $traceName');
+        _updateStatus('Success! Saved to $localPath');
       } else {
         _updateStatus('Pull failed: ${result.stderr}');
       }
@@ -313,7 +335,8 @@ data_sources: {
 
   Future<void> _openTraceInBrowser() async {
     final fileName = _outputFileController.text;
-    final filePath = '${Directory.current.path}\\$fileName';
+    final tracesDir = Directory('${Directory.current.path}\\Traces');
+    final filePath = '${tracesDir.path}\\$fileName';
 
     if (!File(filePath).existsSync()) {
       _updateStatus('File not found: $fileName');
@@ -371,14 +394,14 @@ data_sources: {
               value: _selectedDevice,
               isDense: true,
               menuMaxHeight: 300,
-              hint: const Text('No Device'),
+              hint: const Text('No Device', style: TextStyle(fontSize: 12)),
               selectedItemBuilder: (BuildContext context) {
                 return _adbDevices.map<Widget>((String item) {
                   return Row(
                     children: [
-                      const Icon(Icons.phone_android, size: 18),
+                      const Icon(Icons.phone_android, size: 12),
                       const SizedBox(width: 8),
-                      Text(item),
+                      Text(item, style: const TextStyle(fontSize: 12)),
                     ],
                   );
                 }).toList();
@@ -432,15 +455,15 @@ data_sources: {
                         child: ElevatedButton.icon(
 
                           label: Text(
-                            _isRecording ? 'STOP' : 'START RECORDING',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            _isRecording ? 'STOP' : 'START',
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isRecording ? Colors.redAccent : Colors.blueAccent,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
-                          onPressed: _isRecording ? _stopRecording : _startRecording,
+                          onPressed: _isButtonLocked ? null : (_isRecording ? _stopRecording : _startRecording),
                         ),
                       ),
                     ),
@@ -539,12 +562,16 @@ data_sources: {
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.folder_open),
                         label: const Text('Open Explorer'),
-                        onPressed: () {
-                          final filePath = '${Directory.current.path}\\${_outputFileController.text}';
+                        onPressed: () async {
+                          final tracesDir = Directory('${Directory.current.path}\\Traces');
+                          if (!await tracesDir.exists()) {
+                            await tracesDir.create(recursive: true);
+                          }
+                          final filePath = '${tracesDir.path}\\${_outputFileController.text}';
                           if (File(filePath).existsSync()) {
                             Process.run('explorer.exe', ['/select,', filePath]);
                           } else {
-                            Process.run('explorer.exe', [Directory.current.path]);
+                            Process.run('explorer.exe', [tracesDir.path]);
                           }
                         },
                       ),
@@ -603,7 +630,7 @@ data_sources: {
                     textAlignVertical: TextAlignVertical.top,
                     style: const TextStyle(fontSize: 12),
                     decoration: const InputDecoration(
-                      labelText: 'Additional atrace/frace events',
+                      labelText: 'Additional Atrace/Ftrace events',
                       alignLabelWithHint: true,
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.category),
@@ -676,7 +703,7 @@ data_sources: {
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: Theme.of(context).colorScheme.surface,
-                                            border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.5)),
+                                            border: Border.all(color: Theme.of(context).dividerColor.withAlpha(128)),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
@@ -696,7 +723,7 @@ data_sources: {
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
                                             color: Theme.of(context).colorScheme.surface,
-                                            border: Border.all(color: Theme.of(context).dividerColor.withOpacity(0.5)),
+                                            border: Border.all(color: Theme.of(context).dividerColor.withAlpha(128)),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(

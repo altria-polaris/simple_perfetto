@@ -70,11 +70,11 @@ class SettingsScreen extends StatelessWidget {
                     Colors.purple,
                   ];
                   return Wrap(
-                    spacing: 12,
+                    spacing: 40,
                     runSpacing: 12,
                     alignment: WrapAlignment.center,
                     children: colors.map((color) {
-                      final isSelected = currentColor.value == color.value;
+                      final isSelected = currentColor == color;
                       return GestureDetector(
                         onTap: () => colorSeedNotifier.value = color,
                         child: Container(
@@ -86,7 +86,7 @@ class SettingsScreen extends StatelessWidget {
                             border: isSelected ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3) : null,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
+                                color: Colors.black.withAlpha(50),
                                 blurRadius: 4,
                                 offset: const Offset(0, 2),
                               ),
