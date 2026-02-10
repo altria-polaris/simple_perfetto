@@ -57,17 +57,16 @@ class SettingsScreen extends StatelessWidget {
               child: ValueListenableBuilder<Color>(
                 valueListenable: colorSeedNotifier,
                 builder: (context, currentColor, _) {
-                  final colors = [
+                  // A curated list of visually comfortable colors.
+                  final List<Color> colors = [
                     Colors.blueGrey,
-                    Colors.blue,
                     Colors.indigo,
+                    Colors.blue,
                     Colors.teal,
                     Colors.green,
+                    Colors.deepPurple,
                     Colors.orange,
-                    Colors.deepOrange,
-                    Colors.red,
-                    Colors.pink,
-                    Colors.purple,
+                    Colors.brown,
                   ];
                   return Wrap(
                     spacing: 40,
@@ -103,6 +102,25 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 24),
+          _buildSectionTitle(context, 'Actions'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Center(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reset to Defaults'),
+                  onPressed: () => _showResetConfirmationDialog(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                    side: BorderSide(
+                        color: Theme.of(context).colorScheme.error.withOpacity(0.5)),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -118,6 +136,36 @@ class SettingsScreen extends StatelessWidget {
           fontWeight: FontWeight.bold,
         ),
       ),
+    );
+  }
+
+  Future<void> _showResetConfirmationDialog(BuildContext context) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Reset Settings?'),
+          content: const Text(
+              'This will reset all appearance settings to their default values. This action cannot be undone.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Reset', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              onPressed: () {
+                // Reset the notifiers to their default values
+                themeModeNotifier.value = ThemeMode.dark;
+                colorSeedNotifier.value = Colors.blueGrey;
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'recorder.dart';
 import 'converter.dart';
@@ -13,6 +14,20 @@ final ValueNotifier<Color> colorSeedNotifier = ValueNotifier(Colors.blueGrey);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  final prefs = await SharedPreferences.getInstance();
+  // Load ThemeMode
+  final themeModeName = prefs.getString('themeMode') ?? ThemeMode.dark.name;
+  themeModeNotifier.value = ThemeMode.values.firstWhere((e) => e.name == themeModeName, orElse: () => ThemeMode.dark);
+
+  // Load ColorSeed
+  final colorValue = prefs.getInt('colorSeed') ?? Colors.blueGrey.value;
+  colorSeedNotifier.value = Color(colorValue);
+
+  // Add listeners to save changes
+  themeModeNotifier.addListener(() => prefs.setString('themeMode', themeModeNotifier.value.name));
+  colorSeedNotifier.addListener(() => prefs.setInt('colorSeed', colorSeedNotifier.value.value));
+
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
     await windowManager.setSize(const Size(600, 600));
