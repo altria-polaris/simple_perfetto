@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'recorder.dart';
@@ -11,6 +12,7 @@ import 'settings.dart';
 // Global Theme Notifiers
 final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(ThemeMode.dark);
 final ValueNotifier<Color> colorSeedNotifier = ValueNotifier(Colors.blueGrey);
+final ValueNotifier<Locale?> localeNotifier = ValueNotifier(null);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,9 +26,31 @@ Future<void> main() async {
   final colorValue = prefs.getInt('colorSeed') ?? Colors.blueGrey.value;
   colorSeedNotifier.value = Color(colorValue);
 
+  // Load Locale
+  final languageCode = prefs.getString('languageCode');
+  if (languageCode != null) {
+    final countryCode = prefs.getString('countryCode');
+    localeNotifier.value = Locale(languageCode, countryCode);
+  }
+
   // Add listeners to save changes
   themeModeNotifier.addListener(() => prefs.setString('themeMode', themeModeNotifier.value.name));
   colorSeedNotifier.addListener(() => prefs.setInt('colorSeed', colorSeedNotifier.value.value));
+  localeNotifier.addListener(() async {
+    final prefs = await SharedPreferences.getInstance();
+    final locale = localeNotifier.value;
+    if (locale == null) {
+      await prefs.remove('languageCode');
+      await prefs.remove('countryCode');
+    } else {
+      await prefs.setString('languageCode', locale.languageCode);
+      if (locale.countryCode != null) {
+        await prefs.setString('countryCode', locale.countryCode!);
+      } else {
+        await prefs.remove('countryCode');
+      }
+    }
+  });
 
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
@@ -49,20 +73,37 @@ class PerfettoRecorderApp extends StatelessWidget {
         return ValueListenableBuilder<Color>(
           valueListenable: colorSeedNotifier,
           builder: (context, colorSeed, _) {
-            return MaterialApp(
-              title: 'Perfetto UI Recorder',
-              theme: ThemeData(
-                colorSchemeSeed: colorSeed,
-                brightness: Brightness.light,
-                useMaterial3: true,
-              ),
-              darkTheme: ThemeData(
-                colorSchemeSeed: colorSeed,
-                brightness: Brightness.dark,
-                useMaterial3: true,
-              ),
-              themeMode: themeMode,
-              home: const MainScreen(),
+            return ValueListenableBuilder<Locale?>(
+              valueListenable: localeNotifier,
+              builder: (context, locale, _) {
+                return MaterialApp(
+                  title: 'Perfetto UI Recorder',
+                  theme: ThemeData(
+                    colorSchemeSeed: colorSeed,
+                    brightness: Brightness.light,
+                    useMaterial3: true,
+                  ),
+                  darkTheme: ThemeData(
+                    colorSchemeSeed: colorSeed,
+                    brightness: Brightness.dark,
+                    useMaterial3: true,
+                  ),
+                  themeMode: themeMode,
+                  locale: locale,
+                  localizationsDelegates: AppLocalizations.localizationsDelegates,
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  builder: (context, child) {
+                    final l10n = AppLocalizations.of(context);
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        textTheme: Theme.of(context).textTheme.apply(fontFamily: l10n?.fontFamily),
+                      ),
+                      child: child!,
+                    );
+                  },
+                  home: const MainScreen(),
+                );
+              },
             );
           },
         );
@@ -92,6 +133,7 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: Row(
         children: [
@@ -107,21 +149,21 @@ class _MainScreenState extends State<MainScreen> {
                     });
                   },
                   labelType: NavigationRailLabelType.all,
-                  destinations: const [
+                  destinations: [
                     NavigationRailDestination(
                       icon: Icon(Icons.fiber_manual_record_outlined),
                       selectedIcon: Icon(Icons.fiber_manual_record),
-                      label: Text('Record'),
+                      label: Text(l10n.record),
                     ),
                     NavigationRailDestination(
                       icon: Icon(Icons.stacked_bar_chart_outlined),
                       selectedIcon: Icon(Icons.stacked_bar_chart),
-                      label: Text('Call Stack'),
+                      label: Text(l10n.callStack),
                     ),
                     NavigationRailDestination(
                       icon: Icon(Icons.transform_outlined),
                       selectedIcon: Icon(Icons.transform),
-                      label: Text('Convert'),
+                      label: Text(l10n.convert),
                     ),
                   ],
                 ),
@@ -137,7 +179,7 @@ class _MainScreenState extends State<MainScreen> {
                       selectedIcon: const Icon(Icons.settings),
                       onPressed: () => setState(() => _selectedIndex = 3),
                     ),
-                    const Text('Settings', style: TextStyle(fontSize: 12)),
+                    Text(l10n.settings, style: const TextStyle(fontSize: 12)),
                     const SizedBox(height: 16),
                     IconButton(
                       isSelected: _selectedIndex == 4,
@@ -145,7 +187,7 @@ class _MainScreenState extends State<MainScreen> {
                       selectedIcon: const Icon(Icons.person),
                       onPressed: () => setState(() => _selectedIndex = 4),
                     ),
-                    const Text('About', style: TextStyle(fontSize: 12)),
+                    Text(l10n.about, style: const TextStyle(fontSize: 12)),
                   ],
                 ),
               ),

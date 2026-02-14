@@ -1,22 +1,23 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'l10n/app_localizations.dart';
 
 class TraceConverterScreen extends StatelessWidget {
   const TraceConverterScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Perfetto Trace to Atrace'),
+        title: Text(l10n.converterTitle),
       ),
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.transform, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('Perfetto Trace to Atrace Converter'),
+            const Icon(Icons.transform, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text(l10n.converterMessage),
           ],
         ),
       ),

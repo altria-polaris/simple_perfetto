@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'l10n/app_localizations.dart';
 
 class RecorderScreen extends StatefulWidget {
   const RecorderScreen({super.key});
@@ -384,17 +385,18 @@ data_sources: {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
         forceMaterialTransparency: true,
-        title: const Text('Simple Perfetto Recorder'),
+        title: Text(l10n.appTitle),
         actions: [
           DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedDevice,
               isDense: true,
               menuMaxHeight: 300,
-              hint: const Text('No Device', style: TextStyle(fontSize: 12)),
+              hint: Text(l10n.noDevice, style: const TextStyle(fontSize: 12)),
               selectedItemBuilder: (BuildContext context) {
                 return _adbDevices.map<Widget>((String item) {
                   return Row(
@@ -413,7 +415,7 @@ data_sources: {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _refreshAdbDevices,
-            tooltip: 'Refresh Devices',
+            tooltip: l10n.refreshDevices,
           ),
         ],
       ),
@@ -455,7 +457,7 @@ data_sources: {
                         child: ElevatedButton.icon(
 
                           label: Text(
-                            _isRecording ? 'STOP' : 'START',
+                            _isRecording ? l10n.stop : l10n.start,
                             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                           style: ElevatedButton.styleFrom(
@@ -482,7 +484,7 @@ data_sources: {
                   child: Row(
                     children: [
                       const Icon(Icons.timer_outlined),
-                      const Text('  Max Duration', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('  ${l10n.maxDuration}', style: const TextStyle(fontWeight: FontWeight.bold)),
                       Expanded(
                         flex: 1,
                         child: Slider(
@@ -499,7 +501,7 @@ data_sources: {
                       ),
                       const SizedBox(width: 12),
                       const Icon(Icons.restore_outlined),
-                      const Text('  Buffer Size', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('  ${l10n.bufferSize}', style: const TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 1,
@@ -538,7 +540,7 @@ data_sources: {
                   controller: _outputFileController,
                   readOnly: _autoGenerateFilename,
                   decoration: InputDecoration(
-                    labelText: 'Output Trace File',
+                    labelText: l10n.outputTraceFile,
                     border: const OutlineInputBorder(),
                     prefixIcon: _autoGenerateFilename ? const Icon(Icons.file_open) : const Icon(Icons.edit_document),
                     suffixIcon: IconButton(
@@ -561,7 +563,7 @@ data_sources: {
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.folder_open),
-                        label: const Text('Open Explorer'),
+                        label: Text(l10n.openExplorer),
                         onPressed: () async {
                           final tracesDir = Directory('${Directory.current.path}\\Traces');
                           if (!await tracesDir.exists()) {
@@ -580,7 +582,7 @@ data_sources: {
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.open_in_browser),
-                        label: const Text('Open Perfetto'),
+                        label: Text(l10n.openPerfetto),
                         onPressed: _openTraceInBrowser,
                       ),
                     ),
@@ -600,7 +602,7 @@ data_sources: {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   //Quick Presets
-                  _buildSectionTitle('Quick Presets'),
+                  _buildSectionTitle(l10n.quickPresets),
                   Theme(
                     data: Theme.of(context).copyWith(
                       splashFactory: NoSplash.splashFactory,
@@ -630,7 +632,7 @@ data_sources: {
                     textAlignVertical: TextAlignVertical.top,
                     style: const TextStyle(fontSize: 12),
                     decoration: const InputDecoration(
-                      labelText: 'Additional Atrace/Ftrace events',
+                      labelText: "Additional Atrace/Ftrace events",
                       alignLabelWithHint: true,
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.category),
@@ -644,8 +646,8 @@ data_sources: {
                     controller: _appNameController,
                     style: const TextStyle(fontSize: 12),
                     decoration: const InputDecoration(
-                      labelText: 'User process/package names',
-                      hintText: 'e.g. com.example.app',
+                      labelText: "User process/package names",
+                      hintText: "e.g. com.example.app",
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.apps),
                       isDense: true,
@@ -663,7 +665,7 @@ data_sources: {
                         child: Row(
                           children: [
                             Text(
-                              'Active Categories (${_getAllCategories().length})',
+                              '${l10n.activeCategories} (${_getAllCategories().length})',
                               style: const TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
                             ),
                             const Spacer(),
@@ -696,7 +698,7 @@ data_sources: {
                                   children: [
                                     Row(
                                       children: [
-                                        const Text('atrace', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        Text(l10n.atrace, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                         const SizedBox(width: 8),
                                         ..._getAllCategories().map((tag) => Container(
                                           margin: const EdgeInsets.only(right: 6),
@@ -716,7 +718,7 @@ data_sources: {
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        const Text('ftrace', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        Text(l10n.ftrace, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                         const SizedBox(width: 8),
                                         ...['sched/sched_switch', 'power/suspend_resume', 'ftrace/print'].map((tag) => Container(
                                           margin: const EdgeInsets.only(right: 6),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'l10n/app_localizations.dart';
 import 'main.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -6,14 +7,15 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: Text(l10n.settings),
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          _buildSectionTitle(context, 'Appearance'),
+          _buildSectionTitle(context, l10n.appearance),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -23,7 +25,7 @@ class SettingsScreen extends StatelessWidget {
                     children: [
                       const Icon(Icons.brightness_6),
                       const SizedBox(width: 16),
-                      const Expanded(child: Text('Theme Mode')),
+                      Expanded(child: Text(l10n.themeMode)),
                       ValueListenableBuilder<ThemeMode>(
                         valueListenable: themeModeNotifier,
                         builder: (context, mode, _) {
@@ -35,11 +37,41 @@ class SettingsScreen extends StatelessWidget {
                                 themeModeNotifier.value = newMode;
                               }
                             },
-                            items: const [
-                              DropdownMenuItem(value: ThemeMode.system, child: Text('System')),
-                              DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
-                              DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark')),
+                            items: [
+                              DropdownMenuItem(value: ThemeMode.system, child: Text(l10n.themeModeSystem)),
+                              DropdownMenuItem(value: ThemeMode.light, child: Text(l10n.themeModeLight)),
+                              DropdownMenuItem(value: ThemeMode.dark, child: Text(l10n.themeModeDark)),
                             ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  Row(
+                    children: [
+                      const Icon(Icons.language),
+                      const SizedBox(width: 16),
+                      Expanded(child: Text(l10n.language)),
+                      ValueListenableBuilder<Locale?>(
+                        valueListenable: localeNotifier,
+                        builder: (context, locale, _) {
+                          // Ensure the current value is one of the available options.
+                          // If the current locale is not in the list (e.g., a base 'zh'),
+                          // map it to null (System Default) to prevent the crash.
+                          final availableItems = <Locale?>[null, const Locale('en'), const Locale('zh', 'TW'), const Locale('zh', 'CN')];
+                          final dropdownValue = availableItems.contains(locale) ? locale : null;
+
+                          return DropdownButton<Locale?>(
+                            value: dropdownValue,
+                            underline: const SizedBox(),
+                            hint: Text(l10n.systemDefault),
+                            onChanged: (Locale? newLocale) {
+                              localeNotifier.value = newLocale;
+                            },
+                            items: availableItems.map((l) {
+                              return DropdownMenuItem(value: l, child: Text(_getLocaleName(l, l10n)));
+                            }).toList(),
                           );
                         },
                       ),
@@ -50,7 +82,7 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          _buildSectionTitle(context, 'Color Scheme'),
+          _buildSectionTitle(context, l10n.colorScheme),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -103,19 +135,18 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          _buildSectionTitle(context, 'Actions'),
+          _buildSectionTitle(context, l10n.actions),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Center(
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Reset to Defaults'),
+                  label: Text(l10n.resetToDefaults),
                   onPressed: () => _showResetConfirmationDialog(context),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Theme.of(context).colorScheme.error,
-                    side: BorderSide(
-                        color: Theme.of(context).colorScheme.error.withOpacity(0.5)),
+                    side: BorderSide(color: Theme.of(context).colorScheme.error.withAlpha(128)),
                   ),
                 ),
               ),
@@ -139,27 +170,47 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  String _getLocaleName(Locale? locale, AppLocalizations l10n) {
+    if (locale == null) {
+      return l10n.systemDefault;
+    }
+    switch (locale.languageCode) {
+      case 'en':
+        return l10n.english;
+      case 'zh':
+        switch (locale.countryCode) {
+          case 'TW':
+            return l10n.traditionalChinese;
+          case 'CN':
+            return l10n.simplifiedChinese;
+        }
+    }
+    // Fallback for any other locale
+    return locale.toLanguageTag();
+  }
+
   Future<void> _showResetConfirmationDialog(BuildContext context) async {
     return showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) {
+        final l10n = AppLocalizations.of(dialogContext)!;
         return AlertDialog(
-          title: const Text('Reset Settings?'),
-          content: const Text(
-              'This will reset all appearance settings to their default values. This action cannot be undone.'),
+          title: Text(l10n.resetSettingsConfirmationTitle),
+          content: Text(l10n.resetSettingsConfirmationContent),
           actions: <Widget>[
             TextButton(
-              child: const Text('Cancel'),
+              child: Text(l10n.cancel),
               onPressed: () {
                 Navigator.of(dialogContext).pop();
               },
             ),
             TextButton(
-              child: Text('Reset', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              child: Text(l10n.reset, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               onPressed: () {
                 // Reset the notifiers to their default values
                 themeModeNotifier.value = ThemeMode.dark;
                 colorSeedNotifier.value = Colors.blueGrey;
+                localeNotifier.value = null;
                 Navigator.of(dialogContext).pop();
               },
             ),
