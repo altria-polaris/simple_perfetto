@@ -41,5 +41,12 @@
     "converterMessage": "Perfetto Trace to Atrace Converter",
     "atrace": "atrace",
     "ftrace": "ftrace",
-    "fontFamily": "Roboto"
+    "fontFamily": "Roboto",
+    "updates": "Updates",
+    "checkForUpdates": "Check for Updates",
+    "updateAvailable": "Update Available",
+    "upToDate": "App is up to date",
+    "downloading": "Downloading...",
+    "installAndRestart": "Install & Restart",
+    "errorCheckingUpdate": "Error checking for update"
 }

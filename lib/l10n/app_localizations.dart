@@ -93,8 +93,7 @@ abstract class AppLocalizations {
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('zh'),
-    Locale('zh', 'CN'),
-    Locale('zh', 'TW')
+    Locale('zh', 'CN')
   ];
 
   /// No description provided for @settings.
@@ -348,6 +347,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Roboto'**
   String get fontFamily;
+
+  /// No description provided for @updates.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates'**
+  String get updates;
+
+  /// No description provided for @checkForUpdates.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for Updates'**
+  String get checkForUpdates;
+
+  /// No description provided for @updateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Available'**
+  String get updateAvailable;
+
+  /// No description provided for @upToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'App is up to date'**
+  String get upToDate;
+
+  /// No description provided for @downloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading...'**
+  String get downloading;
+
+  /// No description provided for @installAndRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Install & Restart'**
+  String get installAndRestart;
+
+  /// No description provided for @errorCheckingUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Error checking for update'**
+  String get errorCheckingUpdate;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
@@ -372,7 +413,6 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
     case 'zh': {
   switch (locale.countryCode) {
     case 'CN': return AppLocalizationsZhCn();
-case 'TW': return AppLocalizationsZhTw();
    }
   break;
    }

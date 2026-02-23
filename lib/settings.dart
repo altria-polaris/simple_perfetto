@@ -13,7 +13,7 @@ class SettingsScreen extends StatelessWidget {
         title: Text(l10n.settings),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(18),
         children: [
           _buildSectionTitle(context, l10n.appearance),
           Card(
@@ -81,7 +81,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           _buildSectionTitle(context, l10n.colorScheme),
           Card(
             child: Padding(
@@ -91,13 +91,10 @@ class SettingsScreen extends StatelessWidget {
                 builder: (context, currentColor, _) {
                   // A curated list of visually comfortable colors.
                   final List<Color> colors = [
-                    Colors.blueGrey,
                     Colors.indigo,
                     Colors.blue,
-                    Colors.teal,
-                    Colors.green,
-                    Colors.deepPurple,
                     Colors.orange,
+                    Colors.green,
                     Colors.brown,
                   ];
                   return Wrap(
@@ -208,7 +205,7 @@ class SettingsScreen extends StatelessWidget {
               child: Text(l10n.reset, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               onPressed: () {
                 // Reset the notifiers to their default values
-                themeModeNotifier.value = ThemeMode.dark;
+                themeModeNotifier.value = ThemeMode.light;
                 colorSeedNotifier.value = Colors.blueGrey;
                 localeNotifier.value = null;
                 Navigator.of(dialogContext).pop();
@@ -220,3 +217,4 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 }
+

@@ -22,8 +22,8 @@
     "resetSettingsConfirmationContent": "這會將所有外觀設定重設為預設值。此操作無法復原。",
     "cancel": "取消",
     "reset": "重設",
-    "appTitle": "簡易 Perfetto 錄製器",
-    "noDevice": "無裝置",
+    "appTitle": "Perfetto Trace Recorder",
+    "noDevice": "No Device",
     "refreshDevices": "重新整理裝置",
     "start": "開始",
     "stop": "停止",
@@ -41,5 +41,12 @@
     "converterMessage": "Perfetto Trace 轉 Atrace 轉換器",
     "atrace": "atrace",
     "ftrace": "ftrace",
-    "fontFamily": "Microsoft JhengHei"
+    "fontFamily": "Microsoft JhengHei",
+    "updates": "更新",
+    "checkForUpdates": "檢查更新",
+    "updateAvailable": "有可用更新",
+    "upToDate": "已是最新版本",
+    "downloading": "下載中...",
+    "installAndRestart": "安裝並重啟",
+    "errorCheckingUpdate": "檢查更新時發生錯誤"
 }

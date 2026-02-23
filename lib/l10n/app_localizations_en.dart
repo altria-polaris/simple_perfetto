@@ -133,4 +133,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fontFamily => 'Roboto';
+
+  @override
+  String get updates => 'Updates';
+
+  @override
+  String get checkForUpdates => 'Check for Updates';
+
+  @override
+  String get updateAvailable => 'Update Available';
+
+  @override
+  String get upToDate => 'App is up to date';
+
+  @override
+  String get downloading => 'Downloading...';
+
+  @override
+  String get installAndRestart => 'Install & Restart';
+
+  @override
+  String get errorCheckingUpdate => 'Error checking for update';
 }

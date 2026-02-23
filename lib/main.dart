@@ -35,7 +35,7 @@ Future<void> main() async {
 
   // Add listeners to save changes
   themeModeNotifier.addListener(() => prefs.setString('themeMode', themeModeNotifier.value.name));
-  colorSeedNotifier.addListener(() => prefs.setInt('colorSeed', colorSeedNotifier.value.value));
+  colorSeedNotifier.addListener(() => prefs.setInt('colorSeed', colorSeedNotifier.value.toARGB32()));
   localeNotifier.addListener(() async {
     final prefs = await SharedPreferences.getInstance();
     final locale = localeNotifier.value;

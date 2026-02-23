@@ -75,10 +75,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reset => '重設';
 
   @override
-  String get appTitle => '簡易 Perfetto 錄製器';
+  String get appTitle => 'Perfetto Trace Recorder';
 
   @override
-  String get noDevice => '無裝置';
+  String get noDevice => 'No Device';
 
   @override
   String get refreshDevices => '重新整理裝置';
@@ -133,6 +133,27 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get fontFamily => 'Microsoft JhengHei';
+
+  @override
+  String get updates => '更新';
+
+  @override
+  String get checkForUpdates => '檢查更新';
+
+  @override
+  String get updateAvailable => '有可用更新';
+
+  @override
+  String get upToDate => '已是最新版本';
+
+  @override
+  String get downloading => '下載中...';
+
+  @override
+  String get installAndRestart => '安裝並重啟';
+
+  @override
+  String get errorCheckingUpdate => '檢查更新時發生錯誤';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -206,7 +227,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get reset => '重置';
 
   @override
-  String get appTitle => '简易 Perfetto 录制器';
+  String get appTitle => 'Perfetto Trace Recorder';
 
   @override
   String get noDevice => '无设备';
@@ -263,136 +284,26 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get ftrace => 'ftrace';
 
   @override
-  String get fontFamily => 'Microsoft YaHei';
-}
-
-/// The translations for Chinese, as used in Taiwan (`zh_TW`).
-class AppLocalizationsZhTw extends AppLocalizationsZh {
-  AppLocalizationsZhTw(): super('zh_TW');
+  String get fontFamily => 'Microsoft YaHei UI';
 
   @override
-  String get settings => '設定';
+  String get updates => '更新';
 
   @override
-  String get appearance => '外觀';
+  String get checkForUpdates => '检查更新';
 
   @override
-  String get themeMode => '主題模式';
+  String get updateAvailable => '有可用更新';
 
   @override
-  String get language => '語言';
+  String get upToDate => '已是最新版本';
 
   @override
-  String get colorScheme => '色彩主題';
+  String get downloading => '下载中...';
 
   @override
-  String get actions => '操作';
+  String get installAndRestart => '安装并重启';
 
   @override
-  String get resetToDefaults => '重設為預設值';
-
-  @override
-  String get record => '錄製';
-
-  @override
-  String get callStack => '呼叫堆疊';
-
-  @override
-  String get convert => '轉換';
-
-  @override
-  String get about => '關於';
-
-  @override
-  String get systemDefault => '系統預設';
-
-  @override
-  String get english => 'English';
-
-  @override
-  String get traditionalChinese => '繁體中文';
-
-  @override
-  String get simplifiedChinese => '简体中文';
-
-  @override
-  String get themeModeSystem => '系統預設';
-
-  @override
-  String get themeModeLight => '淺色';
-
-  @override
-  String get themeModeDark => '深色';
-
-  @override
-  String get resetSettingsConfirmationTitle => '重設設定？';
-
-  @override
-  String get resetSettingsConfirmationContent => '這會將所有外觀設定重設為預設值。此操作無法復原。';
-
-  @override
-  String get cancel => '取消';
-
-  @override
-  String get reset => '重設';
-
-  @override
-  String get appTitle => '簡易 Perfetto 錄製器';
-
-  @override
-  String get noDevice => '無裝置';
-
-  @override
-  String get refreshDevices => '重新整理裝置';
-
-  @override
-  String get start => '開始';
-
-  @override
-  String get stop => '停止';
-
-  @override
-  String get maxDuration => '最大長度';
-
-  @override
-  String get bufferSize => '緩衝區大小';
-
-  @override
-  String get outputTraceFile => '輸出 Trace 檔案';
-
-  @override
-  String get openExplorer => '開啟檔案總管';
-
-  @override
-  String get openPerfetto => '開啟 Perfetto';
-
-  @override
-  String get quickPresets => '快速預設';
-
-  @override
-  String get additionalEvents => '額外 Atrace/Ftrace 事件';
-
-  @override
-  String get userProcessNames => '使用者程序/套件名稱';
-
-  @override
-  String get userProcessHint => '例如 com.example.app';
-
-  @override
-  String get activeCategories => '啟用類別';
-
-  @override
-  String get converterTitle => 'Perfetto Trace 轉 Atrace';
-
-  @override
-  String get converterMessage => 'Perfetto Trace 轉 Atrace 轉換器';
-
-  @override
-  String get atrace => 'atrace';
-
-  @override
-  String get ftrace => 'ftrace';
-
-  @override
-  String get fontFamily => 'Microsoft JhengHei';
+  String get errorCheckingUpdate => '检查更新时发生错误';
 }
