@@ -43,10 +43,13 @@
     "ftrace": "ftrace",
     "fontFamily": "Microsoft YaHei UI",
     "updates": "更新",
+    "updateUrl": "更新网址",
+    "updateUrlHint": "例如 http://server/path/to/updates",
     "checkForUpdates": "检查更新",
     "updateAvailable": "有可用更新",
     "upToDate": "已是最新版本",
-    "downloading": "下载中...",
+    "download": "下载更新",
     "installAndRestart": "安装并重启",
-    "errorCheckingUpdate": "检查更新时发生错误"
+    "errorCheckingUpdate": "检查更新时发生错误",
+    "version": "版本"
 }

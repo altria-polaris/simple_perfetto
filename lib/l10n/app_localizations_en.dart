@@ -138,6 +138,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get updates => 'Updates';
 
   @override
+  String get updateUrl => 'Update URL';
+
+  @override
+  String get updateUrlHint => 'e.g. http://server/path/to/updates';
+
+  @override
   String get checkForUpdates => 'Check for Updates';
 
   @override
@@ -147,11 +153,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get upToDate => 'App is up to date';
 
   @override
-  String get downloading => 'Downloading...';
+  String get download => 'Download Update';
 
   @override
   String get installAndRestart => 'Install & Restart';
 
   @override
   String get errorCheckingUpdate => 'Error checking for update';
+
+  @override
+  String get version => 'Version';
 }

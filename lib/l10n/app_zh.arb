@@ -43,10 +43,13 @@
     "ftrace": "ftrace",
     "fontFamily": "Microsoft JhengHei",
     "updates": "更新",
+    "updateUrl": "更新網址",
+    "updateUrlHint": "例如 http://server/path/to/updates",
     "checkForUpdates": "檢查更新",
     "updateAvailable": "有可用更新",
     "upToDate": "已是最新版本",
-    "downloading": "下載中...",
+    "download": "下載更新",
     "installAndRestart": "安裝並重啟",
-    "errorCheckingUpdate": "檢查更新時發生錯誤"
+    "errorCheckingUpdate": "檢查更新時發生錯誤",
+    "version": "版本"
 }

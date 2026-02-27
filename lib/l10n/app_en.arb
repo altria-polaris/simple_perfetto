@@ -43,10 +43,13 @@
     "ftrace": "ftrace",
     "fontFamily": "Roboto",
     "updates": "Updates",
+    "updateUrl": "Update URL",
+    "updateUrlHint": "e.g. http://server/path/to/updates",
     "checkForUpdates": "Check for Updates",
     "updateAvailable": "Update Available",
     "upToDate": "App is up to date",
-    "downloading": "Downloading...",
+    "download": "Download Update",
     "installAndRestart": "Install & Restart",
-    "errorCheckingUpdate": "Error checking for update"
+    "errorCheckingUpdate": "Error checking for update",
+    "version": "Version"
 }

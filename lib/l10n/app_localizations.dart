@@ -354,6 +354,18 @@ abstract class AppLocalizations {
   /// **'Updates'**
   String get updates;
 
+  /// No description provided for @updateUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Update URL'**
+  String get updateUrl;
+
+  /// No description provided for @updateUrlHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. http://server/path/to/updates'**
+  String get updateUrlHint;
+
   /// No description provided for @checkForUpdates.
   ///
   /// In en, this message translates to:
@@ -372,11 +384,11 @@ abstract class AppLocalizations {
   /// **'App is up to date'**
   String get upToDate;
 
-  /// No description provided for @downloading.
+  /// No description provided for @download.
   ///
   /// In en, this message translates to:
-  /// **'Downloading...'**
-  String get downloading;
+  /// **'Download Update'**
+  String get download;
 
   /// No description provided for @installAndRestart.
   ///
@@ -389,6 +401,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Error checking for update'**
   String get errorCheckingUpdate;
+
+  /// No description provided for @version.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get version;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

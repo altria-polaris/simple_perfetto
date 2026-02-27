@@ -138,6 +138,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updates => '更新';
 
   @override
+  String get updateUrl => '更新網址';
+
+  @override
+  String get updateUrlHint => '例如 http://server/path/to/updates';
+
+  @override
   String get checkForUpdates => '檢查更新';
 
   @override
@@ -147,13 +153,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get upToDate => '已是最新版本';
 
   @override
-  String get downloading => '下載中...';
+  String get download => '下載更新';
 
   @override
   String get installAndRestart => '安裝並重啟';
 
   @override
   String get errorCheckingUpdate => '檢查更新時發生錯誤';
+
+  @override
+  String get version => '版本';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -290,6 +299,12 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get updates => '更新';
 
   @override
+  String get updateUrl => '更新网址';
+
+  @override
+  String get updateUrlHint => '例如 http://server/path/to/updates';
+
+  @override
   String get checkForUpdates => '检查更新';
 
   @override
@@ -299,11 +314,14 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get upToDate => '已是最新版本';
 
   @override
-  String get downloading => '下载中...';
+  String get download => '下载更新';
 
   @override
   String get installAndRestart => '安装并重启';
 
   @override
   String get errorCheckingUpdate => '检查更新时发生错误';
+
+  @override
+  String get version => '版本';
 }

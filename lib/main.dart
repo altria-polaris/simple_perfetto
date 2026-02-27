@@ -13,6 +13,7 @@ import 'settings.dart';
 final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(ThemeMode.dark);
 final ValueNotifier<Color> colorSeedNotifier = ValueNotifier(Colors.blueGrey);
 final ValueNotifier<Locale?> localeNotifier = ValueNotifier(null);
+final ValueNotifier<String> updateUrlNotifier = ValueNotifier('');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +34,9 @@ Future<void> main() async {
     localeNotifier.value = Locale(languageCode, countryCode);
   }
 
+  // Load update URL
+  updateUrlNotifier.value = prefs.getString('updateUrl') ?? '';
+
   // Add listeners to save changes
   themeModeNotifier.addListener(() => prefs.setString('themeMode', themeModeNotifier.value.name));
   colorSeedNotifier.addListener(() => prefs.setInt('colorSeed', colorSeedNotifier.value.toARGB32()));
@@ -51,6 +55,7 @@ Future<void> main() async {
       }
     }
   });
+  updateUrlNotifier.addListener(() => prefs.setString('updateUrl', updateUrlNotifier.value));
 
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
