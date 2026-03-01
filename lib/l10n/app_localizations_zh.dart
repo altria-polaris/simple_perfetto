@@ -138,12 +138,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get updates => '更新';
 
   @override
-  String get updateUrl => '更新網址';
-
-  @override
-  String get updateUrlHint => '例如 http://server/path/to/updates';
-
-  @override
   String get checkForUpdates => '檢查更新';
 
   @override
@@ -297,12 +291,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get updates => '更新';
-
-  @override
-  String get updateUrl => '更新网址';
-
-  @override
-  String get updateUrlHint => '例如 http://server/path/to/updates';
 
   @override
   String get checkForUpdates => '检查更新';

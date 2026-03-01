@@ -219,7 +219,7 @@ abstract class AppLocalizations {
   /// No description provided for @cancel.
   ///
   /// In en, this message translates to:
-  /// **'Cancel'**
+  /// **'Dismiss'**
   String get cancel;
 
   /// No description provided for @reset.
@@ -353,18 +353,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Updates'**
   String get updates;
-
-  /// No description provided for @updateUrl.
-  ///
-  /// In en, this message translates to:
-  /// **'Update URL'**
-  String get updateUrl;
-
-  /// No description provided for @updateUrlHint.
-  ///
-  /// In en, this message translates to:
-  /// **'e.g. http://server/path/to/updates'**
-  String get updateUrlHint;
 
   /// No description provided for @checkForUpdates.
   ///

@@ -294,7 +294,7 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
     final updatePath = _kUpdateUrl;
 
     if (updatePath.isEmpty) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.updateUrlHint)));
+      messenger.showSnackBar(SnackBar(content: Text(_kUpdateUrl)));
       return;
     }
 
@@ -328,7 +328,7 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
             content: Text('New version $newVersionString is available. Current version is $currentVersionString.'),
             actions: [
               TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.cancel)),
-              TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.downloading)),
+              TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.download)),
             ],
           ),
         );

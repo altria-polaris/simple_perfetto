@@ -69,7 +69,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resetSettingsConfirmationContent => 'This will reset all appearance settings to their default values. This action cannot be undone.';
 
   @override
-  String get cancel => 'Cancel';
+  String get cancel => 'Dismiss';
 
   @override
   String get reset => 'Reset';
@@ -136,12 +136,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get updates => 'Updates';
-
-  @override
-  String get updateUrl => 'Update URL';
-
-  @override
-  String get updateUrlHint => 'e.g. http://server/path/to/updates';
 
   @override
   String get checkForUpdates => 'Check for Updates';

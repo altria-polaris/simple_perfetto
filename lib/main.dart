@@ -4,7 +4,6 @@ import 'l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 import 'recorder.dart';
-import 'converter.dart';
 import 'callstack.dart';
 import 'about.dart';
 import 'settings.dart';
@@ -117,6 +116,13 @@ class PerfettoRecorderApp extends StatelessWidget {
   }
 }
 
+enum _NavPage {
+  record,
+  callStack,
+  settings,
+  about,
+}
+
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -125,20 +131,13 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
-
-  // Define the pages for each section
-  final List<Widget> _pages = const [
-    RecorderScreen(),
-    CallStackScreen(),
-    TraceConverterScreen(),
-    SettingsScreen(),
-    AboutScreen(),
-  ];
+  _NavPage _selectedPage = _NavPage.record;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final topNavPages = [_NavPage.record, _NavPage.callStack];
+
     return Scaffold(
       body: Row(
         children: [
@@ -147,28 +146,25 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               Expanded(
                 child: NavigationRail(
-                  selectedIndex: _selectedIndex < 3 ? _selectedIndex : null,
+                  selectedIndex: topNavPages.contains(_selectedPage)
+                      ? topNavPages.indexOf(_selectedPage)
+                      : null,
                   onDestinationSelected: (int index) {
                     setState(() {
-                      _selectedIndex = index;
+                      _selectedPage = topNavPages[index];
                     });
                   },
                   labelType: NavigationRailLabelType.all,
                   destinations: [
                     NavigationRailDestination(
-                      icon: Icon(Icons.fiber_manual_record_outlined),
-                      selectedIcon: Icon(Icons.fiber_manual_record),
+                      icon: const Icon(Icons.fiber_manual_record_outlined),
+                      selectedIcon: const Icon(Icons.fiber_manual_record),
                       label: Text(l10n.record),
                     ),
                     NavigationRailDestination(
-                      icon: Icon(Icons.stacked_bar_chart_outlined),
-                      selectedIcon: Icon(Icons.stacked_bar_chart),
+                      icon: const Icon(Icons.stacked_bar_chart_outlined),
+                      selectedIcon: const Icon(Icons.stacked_bar_chart),
                       label: Text(l10n.callStack),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.transform_outlined),
-                      selectedIcon: Icon(Icons.transform),
-                      label: Text(l10n.convert),
                     ),
                   ],
                 ),
@@ -178,21 +174,21 @@ class _MainScreenState extends State<MainScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(
-                      isSelected: _selectedIndex == 3,
-                      icon: const Icon(Icons.settings_outlined),
-                      selectedIcon: const Icon(Icons.settings),
-                      onPressed: () => setState(() => _selectedIndex = 3),
+                    _buildBottomNavItem(
+                      context,
+                      page: _NavPage.settings,
+                      icon: Icons.settings_outlined,
+                      selectedIcon: Icons.settings,
+                      label: l10n.settings,
                     ),
-                    Text(l10n.settings, style: const TextStyle(fontSize: 12)),
                     const SizedBox(height: 16),
-                    IconButton(
-                      isSelected: _selectedIndex == 4,
-                      icon: const Icon(Icons.person_outline),
-                      selectedIcon: const Icon(Icons.person),
-                      onPressed: () => setState(() => _selectedIndex = 4),
+                    _buildBottomNavItem(
+                      context,
+                      page: _NavPage.about,
+                      icon: Icons.person_outline,
+                      selectedIcon: Icons.person,
+                      label: l10n.about,
                     ),
-                    Text(l10n.about, style: const TextStyle(fontSize: 12)),
                   ],
                 ),
               ),
@@ -202,12 +198,47 @@ class _MainScreenState extends State<MainScreen> {
           // Right side content area
           Expanded(
             child: IndexedStack(
-              index: _selectedIndex,
-              children: _pages,
+              index: _selectedPage.index,
+              children: const [
+                RecorderScreen(),
+                CallStackScreen(),
+                SettingsScreen(),
+                AboutScreen(),
+              ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBottomNavItem(
+    BuildContext context, {
+    required _NavPage page,
+    required IconData icon,
+    required IconData selectedIcon,
+    required String label,
+  }) {
+    final isSelected = _selectedPage == page;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          isSelected: isSelected,
+          icon: Icon(icon),
+          selectedIcon: Icon(selectedIcon),
+          onPressed: () => setState(() => _selectedPage = page),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }
