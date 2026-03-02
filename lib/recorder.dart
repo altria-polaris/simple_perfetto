@@ -304,6 +304,7 @@ data_sources: {
 
   // Manual Stop Recording
   Future<void> _stopRecording() async {
+    _timer?.cancel();
     _lockButton();
     if (_recordingProcess != null) {
       _userStopped = true;
@@ -571,9 +572,9 @@ data_sources: {
                           }
                           final filePath = '${tracesDir.path}\\${_outputFileController.text}';
                           if (File(filePath).existsSync()) {
-                            Process.run('explorer.exe', ['/select,', filePath]);
+                            Process.start('explorer.exe', ['/select,', filePath]);
                           } else {
-                            Process.run('explorer.exe', [tracesDir.path]);
+                            Process.start('explorer.exe', [tracesDir.path]);
                           }
                         },
                       ),
