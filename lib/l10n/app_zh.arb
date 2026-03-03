@@ -99,5 +99,9 @@
     "errorCheckingUpdate": "檢查更新時發生錯誤",
     "@errorCheckingUpdate": {},
     "version": "版本",
-    "@version": {}
+    "@version": {},
+    "viewCategories": "檢視類別",
+    "@viewCategories": {},
+    "close": "關閉",
+    "@close": {}
 }

@@ -157,6 +157,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get version => '版本';
+
+  @override
+  String get viewCategories => '檢視類別';
+
+  @override
+  String get close => '關閉';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -312,4 +318,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get version => '版本';
+
+  @override
+  String get viewCategories => '查看类别';
+
+  @override
+  String get close => '关闭';
 }

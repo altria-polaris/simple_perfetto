@@ -99,5 +99,9 @@
     "errorCheckingUpdate": "检查更新时发生错误",
     "@errorCheckingUpdate": {},
     "version": "版本",
-    "@version": {}
+    "@version": {},
+    "viewCategories": "查看类别",
+    "@viewCategories": {},
+    "close": "关闭",
+    "@close": {}
 }

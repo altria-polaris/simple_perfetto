@@ -99,5 +99,9 @@
     "errorCheckingUpdate": "Error checking for update",
     "@errorCheckingUpdate": {},
     "version": "Version",
-    "@version": {}
+    "@version": {},
+    "viewCategories": "View Categories",
+    "@viewCategories": {},
+    "close": "Close",
+    "@close": {}
 }

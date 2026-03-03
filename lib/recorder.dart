@@ -5,6 +5,26 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'l10n/app_localizations.dart';
 
+class RecordingMode {
+  final String label;
+  final IconData icon;
+  final String description;
+  final List<String> atraceCategories;
+  final List<String> ftraceEvents;
+  final Future<void> Function(String? deviceId)? onStart;
+  final Future<void> Function(String? deviceId)? onStop;
+
+  const RecordingMode({
+    required this.label,
+    required this.icon,
+    this.description = '',
+    this.atraceCategories = const [],
+    this.ftraceEvents = const [],
+    this.onStart,
+    this.onStop,
+  });
+}
+
 class RecorderScreen extends StatefulWidget {
   const RecorderScreen({super.key});
 
@@ -16,7 +36,6 @@ class _RecorderScreenState extends State<RecorderScreen> {
   double _durationMs = 10000;
   final TextEditingController _bufferSizeController = TextEditingController();
   bool _autoBufferSize = true;
-  bool _isCategoriesExpanded = true;
   bool _isButtonLocked = false;
 
   // Duration steps for the slider
@@ -33,27 +52,75 @@ class _RecorderScreenState extends State<RecorderScreen> {
     3600000
   ];
 
-  final List<Map<String, dynamic>> _atracePresets = [
-    {
-      'label': 'Basic',
-      'icon': Icons.phone_android,
-      'tags': 'gfx input view wm am',
-    },
-    {
-      'label': 'Camera',
-      'icon': Icons.camera_alt,
-      'tags': 'camera hal video ion gfx sched freq idle',
-    },
-    {
-      'label': 'Graphic',
-      'icon': Icons.videogame_asset,
-      'tags': 'gfx sched freq idle',
-    },
-    {
-      'label': 'Kernel',
-      'icon': Icons.developer_board,
-      'tags': 'sched freq idle irq workq disk sync',
-    },
+  final List<RecordingMode> _recordingModes = [
+    RecordingMode(
+      label: 'Performance',
+      icon: Icons.speed,
+      description: 'Standard gfx + window-manager hooks',
+      atraceCategories: ['gfx', 'input', 'view', 'wm', 'am'],
+    ),
+    RecordingMode(
+      label: 'Camera Tuning',
+      icon: Icons.camera_alt,
+      atraceCategories: [
+        'camera',
+        'hal',
+        'video',
+        'ion',
+        'gfx',
+        'sched',
+        'freq',
+        'idle'
+      ],
+    ),
+    RecordingMode(
+      label: 'Graphic Memory',
+      icon: Icons.videogame_asset,
+      atraceCategories: ['gfx', 'sched', 'freq', 'idle'],
+      // Example onStart/onStop Hooks for extra logging config or ADB action
+    ),
+    RecordingMode(
+      label: 'Kernel Events',
+      icon: Icons.developer_board,
+      atraceCategories: [
+        'sched',
+        'freq',
+        'idle',
+        'irq',
+        'workq',
+        'disk',
+        'sync'
+      ],
+    ),
+    RecordingMode(
+      label: 'Show Touches (Example)',
+      icon: Icons.touch_app,
+      description: 'ADB: enable touch dots during recording',
+      onStart: (deviceId) async {
+        final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
+        await Process.run('adb', [
+          ...deviceArgs,
+          'shell',
+          'settings',
+          'put',
+          'system',
+          'show_touches',
+          '1'
+        ]);
+      },
+      onStop: (deviceId) async {
+        final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
+        await Process.run('adb', [
+          ...deviceArgs,
+          'shell',
+          'settings',
+          'put',
+          'system',
+          'show_touches',
+          '0'
+        ]);
+      },
+    )
   ];
 
   String _formatDuration(int ms) {
@@ -77,7 +144,7 @@ class _RecorderScreenState extends State<RecorderScreen> {
   final TextEditingController _categoriesController = TextEditingController();
   final TextEditingController _appNameController = TextEditingController();
   final TextEditingController _outputFileController = TextEditingController();
-  final ScrollController _categoriesScrollController = ScrollController();
+
   bool _autoGenerateFilename = true;
 
   // ADB Devices
@@ -147,42 +214,31 @@ class _RecorderScreenState extends State<RecorderScreen> {
     }
   }
 
-  // Selected Presets
-  final Set<String> _selectedPresetLabels = {'Basic'};
+  // Selected Modes
+  final Set<String> _selectedModeLabels = {'Performance'};
 
-  // Toggle Preset
-  void _togglePreset(String label, bool selected) {
+  // Toggle Mode
+  void _toggleMode(String label, bool selected) {
     setState(() {
       if (selected) {
-        _selectedPresetLabels.add(label);
+        _selectedModeLabels.add(label);
       } else {
-        _selectedPresetLabels.remove(label);
+        _selectedModeLabels.remove(label);
       }
     });
   }
 
-  // Check if preset is selected
-  bool _isPresetSelected(String label) {
-    return _selectedPresetLabels.contains(label);
+  // Check if mode is selected
+  bool _isModeSelected(String label) {
+    return _selectedModeLabels.contains(label);
   }
 
   Set<String> _getAllCategories() {
-    final manualTags = _categoriesController.text
+    return _categoriesController.text
         .trim()
         .split(RegExp(r'\s+'))
         .where((s) => s.isNotEmpty)
         .toSet();
-    final presetTags = <String>{};
-    for (final preset in _atracePresets) {
-      if (_selectedPresetLabels.contains(preset['label'])) {
-        final tags = (preset['tags'] as String)
-            .trim()
-            .split(RegExp(r'\s+'))
-            .where((s) => s.isNotEmpty);
-        presetTags.addAll(tags);
-      }
-    }
-    return {...presetTags, ...manualTags};
   }
 
   // Process State promt
@@ -412,6 +468,98 @@ data_sources: {
     }
   }
 
+  // --- Categories Dialog ---
+  void _showCategoriesDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final categories = _getAllCategories();
+    final ftraceEvents = [
+      'sched/sched_switch',
+      'power/suspend_resume',
+      'ftrace/print',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.category,
+                size: 20, color: Theme.of(ctx).colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(l10n.activeCategories,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SizedBox(
+          width: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Atrace section
+                Text(l10n.atrace,
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(ctx).colorScheme.primary)),
+                const SizedBox(height: 6),
+                if (categories.isNotEmpty)
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: categories
+                        .map((tag) => Chip(
+                              label: Text(tag,
+                                  style: const TextStyle(fontSize: 12)),
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ))
+                        .toList(),
+                  )
+                else
+                  Text('—',
+                      style:
+                          TextStyle(color: Theme.of(ctx).colorScheme.outline)),
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+                // Ftrace section
+                Text(l10n.ftrace,
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(ctx).colorScheme.primary)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: ftraceEvents
+                      .map((tag) => Chip(
+                            label:
+                                Text(tag, style: const TextStyle(fontSize: 12)),
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                          ))
+                      .toList(),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -420,7 +568,6 @@ data_sources: {
     _appNameController.dispose();
     _outputFileController.dispose();
     _bufferSizeController.dispose();
-    _categoriesScrollController.dispose();
     super.dispose();
   }
 
@@ -528,7 +675,7 @@ data_sources: {
                 ),
                 const SizedBox(height: 8),
 
-                // Settings Row: Duration & Buffer
+                // Settings Row: Duration Slider
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackShape: const RectangularSliderTrackShape(),
@@ -544,7 +691,6 @@ data_sources: {
                       Text('  ${l10n.maxDuration}',
                           style: const TextStyle(fontWeight: FontWeight.bold)),
                       Expanded(
-                        flex: 1,
                         child: Slider(
                           value: _durationSteps
                               .indexOf(_durationMs.toInt())
@@ -562,59 +708,27 @@ data_sources: {
                                   }),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      const Icon(Icons.restore_outlined),
-                      Text('  ${l10n.bufferSize}',
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 1,
-                        child: TextField(
-                          controller: _bufferSizeController,
-                          readOnly: _autoBufferSize,
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          decoration: InputDecoration(
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                                vertical: 8, horizontal: 8),
-                            suffixText: 'MB',
-                            suffixIcon: IconButton(
-                              iconSize: 16,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: _autoBufferSize
-                                  ? const Icon(Icons.lock)
-                                  : const Icon(Icons.lock_open),
-                              onPressed: () {
-                                setState(() {
-                                  _autoBufferSize = !_autoBufferSize;
-                                  if (_autoBufferSize) _updateBufferSize();
-                                });
-                              },
-                              tooltip: _autoBufferSize
-                                  ? 'Unlock to edit'
-                                  : 'Lock to auto-calculate',
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 8),
 
-                // Output Path
+                // Output Trace File (full-width row)
                 TextField(
                   controller: _outputFileController,
                   readOnly: _autoGenerateFilename,
                   decoration: InputDecoration(
                     labelText: l10n.outputTraceFile,
                     border: const OutlineInputBorder(),
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                     prefixIcon: _autoGenerateFilename
                         ? const Icon(Icons.file_open)
                         : const Icon(Icons.edit_document),
                     suffixIcon: IconButton(
+                      iconSize: 16,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                       icon: _autoGenerateFilename
                           ? const Icon(Icons.lock)
                           : const Icon(Icons.lock_open),
@@ -632,12 +746,49 @@ data_sources: {
                 ),
                 const SizedBox(height: 8),
 
-                // Action Buttons
+                // Buffer Size + Action Buttons (merged row)
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    // Buffer Size (compact)
+                    SizedBox(
+                      width: 120,
+                      child: TextField(
+                        controller: _bufferSizeController,
+                        readOnly: _autoBufferSize,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: l10n.bufferSize,
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(
+                              vertical: 8, horizontal: 12),
+                          suffixText: 'MB',
+                          suffixIcon: IconButton(
+                            iconSize: 16,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: _autoBufferSize
+                                ? const Icon(Icons.lock)
+                                : const Icon(Icons.lock_open),
+                            onPressed: () {
+                              setState(() {
+                                _autoBufferSize = !_autoBufferSize;
+                                if (_autoBufferSize) _updateBufferSize();
+                              });
+                            },
+                            tooltip: _autoBufferSize
+                                ? 'Unlock to edit'
+                                : 'Lock to auto-calculate',
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Action Buttons
                     Expanded(
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.folder_open),
+                        icon: const Icon(Icons.folder_open, size: 18),
                         label: Text(l10n.openExplorer),
                         onPressed: () async {
                           final tracesDir =
@@ -656,10 +807,10 @@ data_sources: {
                         },
                       ),
                     ),
-                    const SizedBox(width: 20),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.open_in_browser),
+                        icon: const Icon(Icons.open_in_browser, size: 18),
                         label: Text(l10n.openPerfetto),
                         onPressed: _openTraceInBrowser,
                       ),
@@ -675,12 +826,12 @@ data_sources: {
           // Bottom Section: Settings (Scrollable)
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  //Quick Presets
-                  _buildSectionTitle(l10n.quickPresets),
+                  // Recording Modes
+                  _buildSectionTitle('Recording Modes'),
                   Theme(
                     data: Theme.of(context).copyWith(
                       splashFactory: NoSplash.splashFactory,
@@ -689,20 +840,22 @@ data_sources: {
                     child: Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: _atracePresets.map((p) {
-                        final label = p['label'] as String;
-                        final isSelected = _isPresetSelected(label);
+                      children: _recordingModes.map((m) {
+                        final label = m.label;
+                        final isSelected = _isModeSelected(label);
                         return FilterChip(
                           showCheckmark: false,
-                          avatar: Icon(p['icon'] as IconData, size: 16),
+                          avatar: Icon(m.icon, size: 16),
                           label: Text(label),
+                          tooltip:
+                              m.description.isNotEmpty ? m.description : null,
                           selected: isSelected,
-                          onSelected: (v) => _togglePreset(label, v),
+                          onSelected: (v) => _toggleMode(label, v),
                         );
                       }).toList(),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
 
                   // Categories Inputs
                   TextField(
@@ -717,7 +870,7 @@ data_sources: {
                       isDense: true,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
 
                   // App Name Input
                   TextField(
@@ -731,141 +884,79 @@ data_sources: {
                       isDense: true,
                     ),
                   ),
+                  const Spacer(),
 
-                  // Active Categories Display
-                  if (_getAllCategories().isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () => setState(
-                          () => _isCategoriesExpanded = !_isCategoriesExpanded),
-                      borderRadius: BorderRadius.circular(4),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          children: [
-                            Text(
-                              '${l10n.activeCategories} (${_getAllCategories().length})',
-                              style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold),
+                  // Active Categories Badge + View Button
+                  InkWell(
+                    onTap: () => _showCategoriesDialog(context),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color:
+                            Theme.of(context).colorScheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: Theme.of(context).dividerColor),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.category,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${l10n.activeCategories}:',
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            const Spacer(),
-                            Icon(
-                                _isCategoriesExpanded
-                                    ? Icons.expand_less
-                                    : Icons.expand_more,
-                                color: Colors.grey),
-                          ],
-                        ),
+                            child: Text(
+                              '${l10n.atrace}: ${_getAllCategories().length}',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color:
+                                      Theme.of(context).colorScheme.onPrimary),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .secondaryContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${l10n.ftrace}: 3',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSecondaryContainer),
+                            ),
+                          ),
+                          const Spacer(),
+                          Icon(Icons.open_in_new,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.outline),
+                        ],
                       ),
                     ),
-                    if (_isCategoriesExpanded)
-                      Container(
-                        width: double.infinity,
-                        clipBehavior: Clip.hardEdge,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color:
-                              Theme.of(context).colorScheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: Theme.of(context).dividerColor),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Scrollbar(
-                              controller: _categoriesScrollController,
-                              thumbVisibility: true,
-                              child: SingleChildScrollView(
-                                controller: _categoriesScrollController,
-                                scrollDirection: Axis.horizontal,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(l10n.atrace,
-                                            style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold)),
-                                        const SizedBox(width: 8),
-                                        ..._getAllCategories().map((tag) =>
-                                            Container(
-                                              margin: const EdgeInsets.only(
-                                                  right: 6),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .surface,
-                                                border: Border.all(
-                                                    color: Theme.of(context)
-                                                        .dividerColor
-                                                        .withAlpha(128)),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                tag,
-                                                style: const TextStyle(
-                                                    fontSize: 12),
-                                              ),
-                                            )),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Text(l10n.ftrace,
-                                            style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold)),
-                                        const SizedBox(width: 8),
-                                        ...[
-                                          'sched/sched_switch',
-                                          'power/suspend_resume',
-                                          'ftrace/print'
-                                        ].map((tag) => Container(
-                                              margin: const EdgeInsets.only(
-                                                  right: 6),
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .surface,
-                                                border: Border.all(
-                                                    color: Theme.of(context)
-                                                        .dividerColor
-                                                        .withAlpha(128)),
-                                                borderRadius:
-                                                    BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                tag,
-                                                style: const TextStyle(
-                                                    fontSize: 12),
-                                              ),
-                                            )),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
+                  ),
                 ],
               ),
             ),
