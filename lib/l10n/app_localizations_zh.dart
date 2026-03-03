@@ -132,7 +132,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ftrace => 'ftrace';
 
   @override
-  String get fontFamily => 'Microsoft JhengHei';
+  String get fontFamily => 'Microsoft JhengHei UI';
 
   @override
   String get updates => '更新';
@@ -260,7 +260,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get outputTraceFile => '输出 Trace 文件';
 
   @override
-  String get openExplorer => '打开文件资源管理器';
+  String get openExplorer => '打开文件管理器';
 
   @override
   String get openPerfetto => '打开 Perfetto';
@@ -293,7 +293,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get ftrace => 'ftrace';
 
   @override
-  String get fontFamily => 'Microsoft YaHei UI';
+  String get fontFamily => 'Microsoft JhengHei UI';
 
   @override
   String get updates => '更新';

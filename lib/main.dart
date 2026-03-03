@@ -9,10 +9,42 @@ import 'about.dart';
 import 'settings.dart';
 
 // Global Theme Notifiers
-final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier(ThemeMode.dark);
+final ValueNotifier<ThemeMode> themeModeNotifier =
+    ValueNotifier(ThemeMode.dark);
 final ValueNotifier<Color> colorSeedNotifier = ValueNotifier(Colors.blueGrey);
 final ValueNotifier<Locale?> localeNotifier = ValueNotifier(null);
 final ValueNotifier<String> updateUrlNotifier = ValueNotifier('');
+
+/// Normalize font weights to values actually supported by the CJK font.
+/// Microsoft JhengHei UI only has Regular (w400) and Bold (w700).
+/// Without this, Flutter requests w500 (Medium) for many Material 3 styles,
+/// causing Windows to synthesize faux-bold with uneven stroke widths.
+FontWeight _normalizeWeight(FontWeight? w) {
+  if (w == null) return FontWeight.w400;
+  return w.index >= FontWeight.w600.index ? FontWeight.w700 : FontWeight.w400;
+}
+
+TextTheme _normalizeTextThemeWeights(TextTheme theme) {
+  TextStyle fix(TextStyle? s) => (s ?? const TextStyle())
+      .copyWith(fontWeight: _normalizeWeight(s?.fontWeight));
+  return theme.copyWith(
+    displayLarge: fix(theme.displayLarge),
+    displayMedium: fix(theme.displayMedium),
+    displaySmall: fix(theme.displaySmall),
+    headlineLarge: fix(theme.headlineLarge),
+    headlineMedium: fix(theme.headlineMedium),
+    headlineSmall: fix(theme.headlineSmall),
+    titleLarge: fix(theme.titleLarge),
+    titleMedium: fix(theme.titleMedium),
+    titleSmall: fix(theme.titleSmall),
+    bodyLarge: fix(theme.bodyLarge),
+    bodyMedium: fix(theme.bodyMedium),
+    bodySmall: fix(theme.bodySmall),
+    labelLarge: fix(theme.labelLarge),
+    labelMedium: fix(theme.labelMedium),
+    labelSmall: fix(theme.labelSmall),
+  );
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +52,8 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
   // Load ThemeMode
   final themeModeName = prefs.getString('themeMode') ?? ThemeMode.dark.name;
-  themeModeNotifier.value = ThemeMode.values.firstWhere((e) => e.name == themeModeName, orElse: () => ThemeMode.dark);
+  themeModeNotifier.value = ThemeMode.values
+      .firstWhere((e) => e.name == themeModeName, orElse: () => ThemeMode.dark);
 
   // Load ColorSeed
   final colorValue = prefs.getInt('colorSeed') ?? Colors.blueGrey.value;
@@ -37,8 +70,10 @@ Future<void> main() async {
   updateUrlNotifier.value = prefs.getString('updateUrl') ?? '';
 
   // Add listeners to save changes
-  themeModeNotifier.addListener(() => prefs.setString('themeMode', themeModeNotifier.value.name));
-  colorSeedNotifier.addListener(() => prefs.setInt('colorSeed', colorSeedNotifier.value.toARGB32()));
+  themeModeNotifier.addListener(
+      () => prefs.setString('themeMode', themeModeNotifier.value.name));
+  colorSeedNotifier.addListener(
+      () => prefs.setInt('colorSeed', colorSeedNotifier.value.toARGB32()));
   localeNotifier.addListener(() async {
     final prefs = await SharedPreferences.getInstance();
     final locale = localeNotifier.value;
@@ -54,7 +89,8 @@ Future<void> main() async {
       }
     }
   });
-  updateUrlNotifier.addListener(() => prefs.setString('updateUrl', updateUrlNotifier.value));
+  updateUrlNotifier
+      .addListener(() => prefs.setString('updateUrl', updateUrlNotifier.value));
 
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
@@ -94,14 +130,21 @@ class PerfettoRecorderApp extends StatelessWidget {
                   ),
                   themeMode: themeMode,
                   locale: locale,
-                  localizationsDelegates: AppLocalizations.localizationsDelegates,
+                  localizationsDelegates:
+                      AppLocalizations.localizationsDelegates,
                   supportedLocales: AppLocalizations.supportedLocales,
                   builder: (context, child) {
                     final l10n = AppLocalizations.of(context);
+                    final fontFamily = l10n?.fontFamily;
+                    final baseTheme = Theme.of(context);
+                    // Apply fontFamily and normalize weights to avoid
+                    // faux-bold synthesis on fonts with limited weight
+                    // support (e.g. Microsoft JhengHei UI: w400 + w700 only).
+                    final normalizedTextTheme = _normalizeTextThemeWeights(
+                      baseTheme.textTheme.apply(fontFamily: fontFamily),
+                    );
                     return Theme(
-                      data: Theme.of(context).copyWith(
-                        textTheme: Theme.of(context).textTheme.apply(fontFamily: l10n?.fontFamily),
-                      ),
+                      data: baseTheme.copyWith(textTheme: normalizedTextTheme),
                       child: child!,
                     );
                   },
@@ -235,7 +278,8 @@ class _MainScreenState extends State<MainScreen> {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            color:
+                isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
           ),
         ),
       ],
