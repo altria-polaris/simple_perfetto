@@ -21,9 +21,16 @@ class _RecorderScreenState extends State<RecorderScreen> {
 
   // Duration steps for the slider
   final List<int> _durationSteps = [
-       10000,   15000,   30000,   60000,
-      180000,  300000,  600000,  900000,
-     1800000, 3600000
+    10000,
+    15000,
+    30000,
+    60000,
+    180000,
+    300000,
+    600000,
+    900000,
+    1800000,
+    3600000
   ];
 
   final List<Map<String, dynamic>> _atracePresets = [
@@ -55,7 +62,7 @@ class _RecorderScreenState extends State<RecorderScreen> {
     final m = mInt.toString().padLeft(2, '0');
     final s = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
 
-    return (mInt > 0) ? '$m:$s\tm:s' : '$s\tsec';  
+    return (mInt > 0) ? '$m:$s\tm:s' : '$s\tsec';
   }
 
   String _formatTimer(int ms) {
@@ -95,7 +102,8 @@ class _RecorderScreenState extends State<RecorderScreen> {
         }
         setState(() {
           _adbDevices = devices;
-          if (_selectedDevice == null || !_adbDevices.contains(_selectedDevice)) {
+          if (_selectedDevice == null ||
+              !_adbDevices.contains(_selectedDevice)) {
             _selectedDevice = _adbDevices.isNotEmpty ? _adbDevices.first : null;
           }
         });
@@ -120,9 +128,11 @@ class _RecorderScreenState extends State<RecorderScreen> {
   void _generateNewFilename() {
     final now = DateTime.now();
     final random = Random();
-    final hex = random.nextInt(0x10000).toRadixString(16).toLowerCase().padLeft(4, '0');
+    final hex =
+        random.nextInt(0x10000).toRadixString(16).toLowerCase().padLeft(4, '0');
     String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final fileName = '${now.year}-${twoDigits(now.month)}-${twoDigits(now.day)}_${twoDigits(now.hour)}-${twoDigits(now.minute)}_$hex.pftrace';
+    final fileName =
+        '${now.year}-${twoDigits(now.month)}-${twoDigits(now.day)}_${twoDigits(now.hour)}-${twoDigits(now.minute)}_$hex.pftrace';
     _outputFileController.text = fileName;
   }
 
@@ -157,11 +167,18 @@ class _RecorderScreenState extends State<RecorderScreen> {
   }
 
   Set<String> _getAllCategories() {
-    final manualTags = _categoriesController.text.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toSet();
+    final manualTags = _categoriesController.text
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((s) => s.isNotEmpty)
+        .toSet();
     final presetTags = <String>{};
     for (final preset in _atracePresets) {
       if (_selectedPresetLabels.contains(preset['label'])) {
-        final tags = (preset['tags'] as String).trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty);
+        final tags = (preset['tags'] as String)
+            .trim()
+            .split(RegExp(r'\s+'))
+            .where((s) => s.isNotEmpty);
         presetTags.addAll(tags);
       }
     }
@@ -194,7 +211,10 @@ class _RecorderScreenState extends State<RecorderScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2)),
+      SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2)),
     );
   }
 
@@ -208,7 +228,8 @@ class _RecorderScreenState extends State<RecorderScreen> {
     final categories = _getAllCategories().toList();
     final appName = _appNameController.text.trim();
 
-    String atraceLines = categories.map((c) => '      atrace_categories: "$c"').join('\n');
+    String atraceLines =
+        categories.map((c) => '      atrace_categories: "$c"').join('\n');
     if (appName.isNotEmpty) {
       atraceLines += '\n      atrace_apps: "$appName"';
     }
@@ -259,7 +280,17 @@ data_sources: {
     final deviceArgs = _selectedDevice != null ? ['-s', _selectedDevice!] : [];
     try {
       _recordingProcess = await Process.start(
-        'adb', [...deviceArgs, 'shell', 'perfetto', '-c', '-', '--txt', '-o', '"/data/misc/perfetto-traces/$outputFile"'],
+        'adb',
+        [
+          ...deviceArgs,
+          'shell',
+          'perfetto',
+          '-c',
+          '-',
+          '--txt',
+          '-o',
+          '"/data/misc/perfetto-traces/$outputFile"'
+        ],
       );
 
       // Write config to stdin
@@ -268,7 +299,7 @@ data_sources: {
       await _recordingProcess!.stdin.close();
 
       _updateStatus('Recording in progress...');
-      
+
       // Start Timer
       _elapsedMs = 0;
       _timer?.cancel();
@@ -281,14 +312,13 @@ data_sources: {
 
       // Wait for process to complete
       final exitCode = await _recordingProcess!.exitCode;
-      
+
       if (exitCode == 0 || _userStopped) {
         _updateStatus('Recording finished. Pulling trace...');
         await _pullTraceFile(outputFile);
       } else {
         _updateStatus('Error: Perfetto exited with code $exitCode');
       }
-
     } catch (e) {
       _updateStatus('Error starting process: $e');
     } finally {
@@ -309,8 +339,10 @@ data_sources: {
     if (_recordingProcess != null) {
       _userStopped = true;
       _updateStatus('Stopping manually...');
-      final deviceArgs = _selectedDevice != null ? ['-s', _selectedDevice!] : [];
-      await Process.run('adb', [...deviceArgs, 'shell', 'killall', '-2', 'perfetto']);
+      final deviceArgs =
+          _selectedDevice != null ? ['-s', _selectedDevice!] : [];
+      await Process.run(
+          'adb', [...deviceArgs, 'shell', 'killall', '-2', 'perfetto']);
     }
   }
 
@@ -323,8 +355,14 @@ data_sources: {
       }
       final localPath = '${tracesDir.path}\\$traceName';
 
-      final deviceArgs = _selectedDevice != null ? ['-s', _selectedDevice!] : [];
-      final result = await Process.run('adb', [...deviceArgs, 'pull', '/data/misc/perfetto-traces/$traceName', localPath]);
+      final deviceArgs =
+          _selectedDevice != null ? ['-s', _selectedDevice!] : [];
+      final result = await Process.run('adb', [
+        ...deviceArgs,
+        'pull',
+        '/data/misc/perfetto-traces/$traceName',
+        localPath
+      ]);
       if (result.exitCode == 0) {
         _updateStatus('Success! Saved to $localPath');
       } else {
@@ -351,7 +389,8 @@ data_sources: {
     try {
       _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 9001);
       _server!.listen((HttpRequest request) async {
-        request.response.headers.add('Access-Control-Allow-Origin', 'https://ui.perfetto.dev');
+        request.response.headers
+            .add('Access-Control-Allow-Origin', 'https://ui.perfetto.dev');
         final encodedName = Uri.encodeComponent(fileName);
         if (request.uri.path == '/$encodedName') {
           final file = File(filePath);
@@ -363,7 +402,8 @@ data_sources: {
       });
 
       final encodedName = Uri.encodeComponent(fileName);
-      final url = 'https://ui.perfetto.dev/#!/?url=http://127.0.0.1:9001/$encodedName&referrer=record_android_trace';
+      final url =
+          'https://ui.perfetto.dev/#!/?url=http://127.0.0.1:9001/$encodedName&referrer=record_android_trace';
 
       Process.run('cmd', ['/c', 'start', url]);
       _updateStatus('Serving trace on port 9001...');
@@ -409,7 +449,9 @@ data_sources: {
                   );
                 }).toList();
               },
-              items: _adbDevices.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+              items: _adbDevices
+                  .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                  .toList(),
               onChanged: (v) => setState(() => _selectedDevice = v),
             ),
           ),
@@ -438,11 +480,16 @@ data_sources: {
                         children: [
                           Text(
                             '${_formatTimer(_elapsedMs)} / ${_formatTimer(_durationMs.toInt())} m:s',
-                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                            style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace'),
                           ),
                           const SizedBox(height: 8),
                           LinearProgressIndicator(
-                            value: (_durationMs > 0 && _isRecording)  ? (_elapsedMs / _durationMs).clamp(0.0, 1.0) : 0,
+                            value: (_durationMs > 0 && _isRecording)
+                                ? (_elapsedMs / _durationMs).clamp(0.0, 1.0)
+                                : 0,
                             minHeight: 8,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -456,17 +503,24 @@ data_sources: {
                       child: SizedBox(
                         height: 48,
                         child: ElevatedButton.icon(
-
                           label: Text(
                             _isRecording ? l10n.stop : l10n.start,
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _isRecording ? Colors.redAccent : Colors.blueAccent,
+                            backgroundColor: _isRecording
+                                ? Colors.redAccent
+                                : Colors.blueAccent,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
                           ),
-                          onPressed: _isButtonLocked ? null : (_isRecording ? _stopRecording : _startRecording),
+                          onPressed: _isButtonLocked
+                              ? null
+                              : (_isRecording
+                                  ? _stopRecording
+                                  : _startRecording),
                         ),
                       ),
                     ),
@@ -479,30 +533,39 @@ data_sources: {
                   data: SliderTheme.of(context).copyWith(
                     trackShape: const RectangularSliderTrackShape(),
                     trackHeight: 4,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 8),
+                    overlayShape:
+                        const RoundSliderOverlayShape(overlayRadius: 16),
                   ),
                   child: Row(
                     children: [
                       const Icon(Icons.timer_outlined),
-                      Text('  ${l10n.maxDuration}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text('  ${l10n.maxDuration}',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
                       Expanded(
                         flex: 1,
                         child: Slider(
-                          value: _durationSteps.indexOf(_durationMs.toInt()).toDouble(),
+                          value: _durationSteps
+                              .indexOf(_durationMs.toInt())
+                              .toDouble(),
                           min: 0,
                           max: (_durationSteps.length - 1).toDouble(),
                           divisions: _durationSteps.length - 1,
                           label: _formatDuration(_durationMs.toInt()),
-                          onChanged: _isRecording ? null : (v) => setState(() {
-                            _durationMs = _durationSteps[v.toInt()].toDouble();
-                            _updateBufferSize();
-                          }),
+                          onChanged: _isRecording
+                              ? null
+                              : (v) => setState(() {
+                                    _durationMs =
+                                        _durationSteps[v.toInt()].toDouble();
+                                    _updateBufferSize();
+                                  }),
                         ),
                       ),
                       const SizedBox(width: 12),
                       const Icon(Icons.restore_outlined),
-                      Text('  ${l10n.bufferSize}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text('  ${l10n.bufferSize}',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(width: 8),
                       Expanded(
                         flex: 1,
@@ -513,20 +576,25 @@ data_sources: {
                           textAlign: TextAlign.center,
                           decoration: InputDecoration(
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                            contentPadding: const EdgeInsets.symmetric(
+                                vertical: 8, horizontal: 8),
                             suffixText: 'MB',
                             suffixIcon: IconButton(
                               iconSize: 16,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
-                              icon: _autoBufferSize ? const Icon(Icons.lock) : const Icon(Icons.lock_open),
+                              icon: _autoBufferSize
+                                  ? const Icon(Icons.lock)
+                                  : const Icon(Icons.lock_open),
                               onPressed: () {
                                 setState(() {
                                   _autoBufferSize = !_autoBufferSize;
                                   if (_autoBufferSize) _updateBufferSize();
                                 });
                               },
-                              tooltip: _autoBufferSize ? 'Unlock to edit' : 'Lock to auto-calculate',
+                              tooltip: _autoBufferSize
+                                  ? 'Unlock to edit'
+                                  : 'Lock to auto-calculate',
                             ),
                           ),
                         ),
@@ -543,15 +611,21 @@ data_sources: {
                   decoration: InputDecoration(
                     labelText: l10n.outputTraceFile,
                     border: const OutlineInputBorder(),
-                    prefixIcon: _autoGenerateFilename ? const Icon(Icons.file_open) : const Icon(Icons.edit_document),
+                    prefixIcon: _autoGenerateFilename
+                        ? const Icon(Icons.file_open)
+                        : const Icon(Icons.edit_document),
                     suffixIcon: IconButton(
-                      icon: _autoGenerateFilename ? const Icon(Icons.lock) : const Icon(Icons.lock_open),
+                      icon: _autoGenerateFilename
+                          ? const Icon(Icons.lock)
+                          : const Icon(Icons.lock_open),
                       onPressed: () {
                         setState(() {
                           _autoGenerateFilename = !_autoGenerateFilename;
                         });
                       },
-                      tooltip: _autoGenerateFilename ? 'Unlock to edit' : 'Lock to auto-generate',
+                      tooltip: _autoGenerateFilename
+                          ? 'Unlock to edit'
+                          : 'Lock to auto-generate',
                     ),
                     isDense: true,
                   ),
@@ -566,13 +640,16 @@ data_sources: {
                         icon: const Icon(Icons.folder_open),
                         label: Text(l10n.openExplorer),
                         onPressed: () async {
-                          final tracesDir = Directory('${Directory.current.path}\\Traces');
+                          final tracesDir =
+                              Directory('${Directory.current.path}\\Traces');
                           if (!await tracesDir.exists()) {
                             await tracesDir.create(recursive: true);
                           }
-                          final filePath = '${tracesDir.path}\\${_outputFileController.text}';
+                          final filePath =
+                              '${tracesDir.path}\\${_outputFileController.text}';
                           if (File(filePath).existsSync()) {
-                            Process.start('explorer.exe', ['/select,', filePath]);
+                            Process.start(
+                                'explorer.exe', ['/select,', filePath]);
                           } else {
                             Process.start('explorer.exe', [tracesDir.path]);
                           }
@@ -659,7 +736,8 @@ data_sources: {
                   if (_getAllCategories().isNotEmpty) ...[
                     const SizedBox(height: 8),
                     InkWell(
-                      onTap: () => setState(() => _isCategoriesExpanded = !_isCategoriesExpanded),
+                      onTap: () => setState(
+                          () => _isCategoriesExpanded = !_isCategoriesExpanded),
                       borderRadius: BorderRadius.circular(4),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -667,10 +745,17 @@ data_sources: {
                           children: [
                             Text(
                               '${l10n.activeCategories} (${_getAllCategories().length})',
-                              style: const TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold),
                             ),
                             const Spacer(),
-                            Icon(_isCategoriesExpanded ? Icons.expand_less : Icons.expand_more, color: Colors.grey),
+                            Icon(
+                                _isCategoriesExpanded
+                                    ? Icons.expand_less
+                                    : Icons.expand_more,
+                                color: Colors.grey),
                           ],
                         ),
                       ),
@@ -679,11 +764,14 @@ data_sources: {
                       Container(
                         width: double.infinity,
                         clipBehavior: Clip.hardEdge,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerLow,
+                          color:
+                              Theme.of(context).colorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Theme.of(context).dividerColor),
+                          border:
+                              Border.all(color: Theme.of(context).dividerColor),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -699,47 +787,79 @@ data_sources: {
                                   children: [
                                     Row(
                                       children: [
-                                        Text(l10n.atrace, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        Text(l10n.atrace,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold)),
                                         const SizedBox(width: 8),
-                                        ..._getAllCategories().map((tag) => Container(
-                                          margin: const EdgeInsets.only(right: 6),
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.surface,
-                                            border: Border.all(color: Theme.of(context).dividerColor.withAlpha(128)),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            tag,
-                                            style: const TextStyle(fontSize: 12),
-                                          ),
-                                        )),
+                                        ..._getAllCategories().map((tag) =>
+                                            Container(
+                                              margin: const EdgeInsets.only(
+                                                  right: 6),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .surface,
+                                                border: Border.all(
+                                                    color: Theme.of(context)
+                                                        .dividerColor
+                                                        .withAlpha(128)),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                tag,
+                                                style: const TextStyle(
+                                                    fontSize: 12),
+                                              ),
+                                            )),
                                       ],
                                     ),
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        Text(l10n.ftrace, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        Text(l10n.ftrace,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold)),
                                         const SizedBox(width: 8),
-                                        ...['sched/sched_switch', 'power/suspend_resume', 'ftrace/print'].map((tag) => Container(
-                                          margin: const EdgeInsets.only(right: 6),
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.surface,
-                                            border: Border.all(color: Theme.of(context).dividerColor.withAlpha(128)),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            tag,
-                                            style: const TextStyle(fontSize: 12),
-                                          ),
-                                        )),
+                                        ...[
+                                          'sched/sched_switch',
+                                          'power/suspend_resume',
+                                          'ftrace/print'
+                                        ].map((tag) => Container(
+                                              margin: const EdgeInsets.only(
+                                                  right: 6),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .surface,
+                                                border: Border.all(
+                                                    color: Theme.of(context)
+                                                        .dividerColor
+                                                        .withAlpha(128)),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                tag,
+                                                style: const TextStyle(
+                                                    fontSize: 12),
+                                              ),
+                                            )),
                                       ],
                                     ),
                                     const SizedBox(height: 12),
                                   ],
                                 ),
-                                
                               ),
                             ),
                           ],
@@ -760,7 +880,8 @@ data_sources: {
       padding: const EdgeInsets.only(bottom: 4.0),
       child: Text(
         title,
-        style: const TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
+        style: const TextStyle(
+            color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
       ),
     );
   }
