@@ -126,12 +126,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get converterMessage => 'Perfetto Trace to Atrace Converter';
 
   @override
-  String get atrace => 'atrace';
-
-  @override
-  String get ftrace => 'ftrace';
-
-  @override
   String get fontFamily => 'Roboto';
 
   @override

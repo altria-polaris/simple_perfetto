@@ -330,18 +330,6 @@ abstract class AppLocalizations {
   /// **'Perfetto Trace to Atrace Converter'**
   String get converterMessage;
 
-  /// No description provided for @atrace.
-  ///
-  /// In en, this message translates to:
-  /// **'atrace'**
-  String get atrace;
-
-  /// No description provided for @ftrace.
-  ///
-  /// In en, this message translates to:
-  /// **'ftrace'**
-  String get ftrace;
-
   /// No description provided for @fontFamily.
   ///
   /// In en, this message translates to:

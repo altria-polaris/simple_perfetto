@@ -126,12 +126,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get converterMessage => 'Perfetto Trace 轉 Atrace 轉換器';
 
   @override
-  String get atrace => 'atrace';
-
-  @override
-  String get ftrace => 'ftrace';
-
-  @override
   String get fontFamily => 'Microsoft JhengHei UI';
 
   @override
@@ -285,12 +279,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get converterMessage => 'Perfetto Trace 转 Atrace 转换器';
-
-  @override
-  String get atrace => 'atrace';
-
-  @override
-  String get ftrace => 'ftrace';
 
   @override
   String get fontFamily => 'Microsoft JhengHei UI';

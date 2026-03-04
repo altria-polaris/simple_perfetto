@@ -190,6 +190,9 @@ class _RecorderScreenState extends State<RecorderScreen> {
     _categoriesController.addListener(() {
       if (mounted) setState(() {});
     });
+    _appNameController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   void _generateNewFilename() {
@@ -205,11 +208,28 @@ class _RecorderScreenState extends State<RecorderScreen> {
 
   void _updateBufferSize() {
     if (_autoBufferSize) {
-      // Auto-calculate buffer size: ~10MB per second
-      int durationSec = _durationMs ~/ 1000;
-      int sizeMb = durationSec * 10;
-      if (sizeMb < 32) sizeMb = 32;
-      if (sizeMb > 2048) sizeMb = 2048;
+      // Stepped buffer size based on duration
+      // 0~15s → 64MB, 30s → 128MB, 60~90s → 256MB,
+      // 3~5min → 512MB, 10~15min → 1024MB, 30min → 2048MB, 60min → 4096MB
+      final durationSec = _durationMs ~/ 1000;
+      int sizeMb;
+      if (durationSec <= 15) {
+        sizeMb = 64;
+      } else if (durationSec <= 30) {
+        sizeMb = 128;
+      } else if (durationSec <= 90) {
+        sizeMb = 256;
+      } else if (durationSec <= 300) {
+        sizeMb = 512;
+      } else if (durationSec <= 900) {
+        sizeMb = 1024;
+      } else if (durationSec <= 1800) {
+        sizeMb = 2048;
+      } else {
+        sizeMb = 4096;
+      }
+      // Clamp to user-allowed range
+      sizeMb = sizeMb.clamp(16, 4096);
       _bufferSizeController.text = sizeMb.toString();
     }
   }
@@ -233,8 +253,44 @@ class _RecorderScreenState extends State<RecorderScreen> {
     return _selectedModeLabels.contains(label);
   }
 
-  Set<String> _getAllCategories() {
+  // Default ftrace events always included
+  static const List<String> _defaultFtraceEvents = [
+    'sched/sched_switch',
+    'power/suspend_resume',
+    'ftrace/print',
+  ];
+
+  /// Parse user input from _categoriesController and split into
+  /// atrace categories (no slash) and ftrace events (contains slash).
+  List<String> _getUserTokens() {
     return _categoriesController.text
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  /// All atrace categories = preset modes + user-entered tokens without '/'
+  Set<String> _getAtraceCategories() {
+    final fromModes = <String>{};
+    for (final mode in _recordingModes) {
+      if (_selectedModeLabels.contains(mode.label)) {
+        fromModes.addAll(mode.atraceCategories);
+      }
+    }
+    final fromUser = _getUserTokens().where((t) => !t.contains('/')).toSet();
+    return {...fromModes, ...fromUser};
+  }
+
+  /// All ftrace events = defaults + user-entered tokens with '/'
+  Set<String> _getFtraceEvents() {
+    final fromUser = _getUserTokens().where((t) => t.contains('/')).toSet();
+    return {..._defaultFtraceEvents, ...fromUser};
+  }
+
+  /// All atrace apps from _appNameController (space-separated)
+  Set<String> _getAtraceApps() {
+    return _appNameController.text
         .trim()
         .split(RegExp(r'\s+'))
         .where((s) => s.isNotEmpty)
@@ -281,13 +337,24 @@ class _RecorderScreenState extends State<RecorderScreen> {
     try {
       bufferSizeKb = int.parse(_bufferSizeController.text) * 1024;
     } catch (_) {}
-    final categories = _getAllCategories().toList();
-    final appName = _appNameController.text.trim();
+    final atraceCategories = _getAtraceCategories().toList();
+    final ftraceEvents = _getFtraceEvents().toList();
+    final atraceApps = _getAtraceApps().toList();
 
-    String atraceLines =
-        categories.map((c) => '      atrace_categories: "$c"').join('\n');
-    if (appName.isNotEmpty) {
-      atraceLines += '\n      atrace_apps: "$appName"';
+    // Build ftrace_events lines
+    String ftraceLines =
+        ftraceEvents.map((e) => '            ftrace_events: "$e"').join('\n');
+
+    // Build atrace_categories lines
+    String atraceLines = atraceCategories
+        .map((c) => '            atrace_categories: "$c"')
+        .join('\n');
+
+    // Build atrace_apps lines
+    if (atraceApps.isNotEmpty) {
+      final appsLines =
+          atraceApps.map((a) => '            atrace_apps: "$a"').join('\n');
+      atraceLines += '\n$appsLines';
     }
 
     return '''
@@ -301,9 +368,7 @@ data_sources: {
     config {
         name: "linux.ftrace"
         ftrace_config {
-            ftrace_events: "sched/sched_switch"
-            ftrace_events: "power/suspend_resume"
-            ftrace_events: "ftrace/print"
+$ftraceLines
 $atraceLines
         }
     }
@@ -471,91 +536,131 @@ data_sources: {
   // --- Categories Dialog ---
   void _showCategoriesDialog(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final categories = _getAllCategories();
-    final ftraceEvents = [
-      'sched/sched_switch',
-      'power/suspend_resume',
-      'ftrace/print',
-    ];
+    final atraceCategories = _getAtraceCategories();
+    final ftraceEvents = _getFtraceEvents();
+    final atraceApps = _getAtraceApps();
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        titlePadding: const EdgeInsets.fromLTRB(20, 16, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
         title: Row(
           children: [
             Icon(Icons.category,
                 size: 20, color: Theme.of(ctx).colorScheme.primary),
             const SizedBox(width: 8),
-            Text(l10n.activeCategories,
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Expanded(
+              child: Text(l10n.activeCategories,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 20),
+              onPressed: () => Navigator.of(ctx).pop(),
+              tooltip: l10n.close,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
           ],
         ),
-        content: SizedBox(
-          width: 400,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Atrace section
-                Text(l10n.atrace,
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(ctx).colorScheme.primary)),
-                const SizedBox(height: 6),
-                if (categories.isNotEmpty)
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: categories
-                        .map((tag) => Chip(
-                              label: Text(tag,
-                                  style: const TextStyle(fontSize: 12)),
-                              visualDensity: VisualDensity.compact,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ))
-                        .toList(),
-                  )
-                else
-                  Text('—',
-                      style:
-                          TextStyle(color: Theme.of(ctx).colorScheme.outline)),
-                const SizedBox(height: 16),
-                const Divider(height: 1),
-                const SizedBox(height: 16),
-                // Ftrace section
-                Text(l10n.ftrace,
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(ctx).colorScheme.primary)),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: ftraceEvents
-                      .map((tag) => Chip(
-                            label:
-                                Text(tag, style: const TextStyle(fontSize: 12)),
-                            visualDensity: VisualDensity.compact,
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                          ))
-                      .toList(),
-                ),
-              ],
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+          ),
+          child: SizedBox(
+            width: 425,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Atrace section
+                  Text('atraces (${atraceCategories.length})',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(ctx).colorScheme.primary)),
+                  const SizedBox(height: 6),
+                  if (atraceCategories.isNotEmpty)
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: atraceCategories
+                          .map((tag) => Chip(
+                                label: Text(tag,
+                                    style: const TextStyle(fontSize: 12)),
+                                visualDensity: VisualDensity.compact,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ))
+                          .toList(),
+                    )
+                  else
+                    Text('—',
+                        style: TextStyle(
+                            color: Theme.of(ctx).colorScheme.outline)),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
+                  // Ftrace section
+                  Text('ftraces (${ftraceEvents.length})',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(ctx).colorScheme.primary)),
+                  const SizedBox(height: 6),
+                  if (ftraceEvents.isNotEmpty)
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: ftraceEvents
+                          .map((tag) => Chip(
+                                label: Text(tag,
+                                    style: const TextStyle(fontSize: 12)),
+                                visualDensity: VisualDensity.compact,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ))
+                          .toList(),
+                    )
+                  else
+                    Text('—',
+                        style: TextStyle(
+                            color: Theme.of(ctx).colorScheme.outline)),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
+                  // Atrace Apps section
+                  Text('atrace_apps (${atraceApps.length})',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(ctx).colorScheme.tertiary)),
+                  const SizedBox(height: 6),
+                  if (atraceApps.isNotEmpty)
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: atraceApps
+                          .map((tag) => Chip(
+                                label: Text(tag,
+                                    style: const TextStyle(fontSize: 12)),
+                                visualDensity: VisualDensity.compact,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ))
+                          .toList(),
+                    )
+                  else
+                    Text('—',
+                        style: TextStyle(
+                            color: Theme.of(ctx).colorScheme.outline)),
+                ],
+              ),
             ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(l10n.close),
-          ),
-        ],
       ),
     );
   }
@@ -744,78 +849,87 @@ data_sources: {
                     isDense: true,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
 
                 // Buffer Size + Action Buttons (merged row)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Buffer Size (compact)
-                    SizedBox(
-                      width: 120,
-                      child: TextField(
-                        controller: _bufferSizeController,
-                        readOnly: _autoBufferSize,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: l10n.bufferSize,
-                          isDense: true,
-                          border: const OutlineInputBorder(),
-                          contentPadding: const EdgeInsets.symmetric(
-                              vertical: 8, horizontal: 12),
-                          suffixText: 'MB',
-                          suffixIcon: IconButton(
-                            iconSize: 16,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            icon: _autoBufferSize
-                                ? const Icon(Icons.lock)
-                                : const Icon(Icons.lock_open),
-                            onPressed: () {
-                              setState(() {
-                                _autoBufferSize = !_autoBufferSize;
-                                if (_autoBufferSize) _updateBufferSize();
-                              });
-                            },
-                            tooltip: _autoBufferSize
-                                ? 'Unlock to edit'
-                                : 'Lock to auto-calculate',
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Buffer Size (compact)
+                      SizedBox(
+                        width: 125,
+                        child: TextField(
+                          textAlign: TextAlign.right,
+                          controller: _bufferSizeController,
+                          readOnly: _autoBufferSize,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: l10n.bufferSize,
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                            contentPadding: const EdgeInsets.symmetric(
+                                vertical: 8, horizontal: 12),
+                            suffixText: 'MB',
+                            suffixIconConstraints: const BoxConstraints(
+                              minWidth: 36,
+                              minHeight: 36,
+                            ),
+                            suffixIcon: IconButton(
+                              iconSize: 16,
+                              constraints: const BoxConstraints(),
+                              padding: EdgeInsets.zero,
+                              icon: _autoBufferSize
+                                  ? const Icon(Icons.lock)
+                                  : const Icon(Icons.lock_open),
+                              onPressed: () {
+                                setState(() {
+                                  _autoBufferSize = !_autoBufferSize;
+                                  if (_autoBufferSize) _updateBufferSize();
+                                });
+                              },
+                              tooltip: _autoBufferSize
+                                  ? 'Unlock to edit'
+                                  : 'Lock to auto-calculate',
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Action Buttons
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.folder_open, size: 18),
-                        label: Text(l10n.openExplorer),
-                        onPressed: () async {
-                          final tracesDir =
-                              Directory('${Directory.current.path}\\Traces');
-                          if (!await tracesDir.exists()) {
-                            await tracesDir.create(recursive: true);
-                          }
-                          final filePath =
-                              '${tracesDir.path}\\${_outputFileController.text}';
-                          if (File(filePath).existsSync()) {
-                            Process.start(
-                                'explorer.exe', ['/select,', filePath]);
-                          } else {
-                            Process.start('explorer.exe', [tracesDir.path]);
-                          }
-                        },
+                      const SizedBox(width: 12),
+                      // Action Buttons
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.folder_open, size: 18),
+                          label: Text(l10n.openExplorer,
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: () async {
+                            final tracesDir =
+                                Directory('${Directory.current.path}\\Traces');
+                            if (!await tracesDir.exists()) {
+                              await tracesDir.create(recursive: true);
+                            }
+                            final filePath =
+                                '${tracesDir.path}\\${_outputFileController.text}';
+                            if (File(filePath).existsSync()) {
+                              Process.start(
+                                  'explorer.exe', ['/select,', filePath]);
+                            } else {
+                              Process.start('explorer.exe', [tracesDir.path]);
+                            }
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.open_in_browser, size: 18),
-                        label: Text(l10n.openPerfetto),
-                        onPressed: _openTraceInBrowser,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.open_in_browser, size: 18),
+                          label: Text(l10n.openPerfetto,
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          onPressed: _openTraceInBrowser,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -921,7 +1035,7 @@ data_sources: {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              '${l10n.atrace}: ${_getAllCategories().length}',
+                              'atraces: ${_getAtraceCategories().length}',
                               style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -940,7 +1054,7 @@ data_sources: {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              '${l10n.ftrace}: 3',
+                              'ftraces: ${_getFtraceEvents().length}',
                               style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -949,6 +1063,28 @@ data_sources: {
                                       .onSecondaryContainer),
                             ),
                           ),
+                          if (_getAtraceApps().isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .tertiaryContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'apps: ${_getAtraceApps().length}',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onTertiaryContainer),
+                              ),
+                            ),
+                          ],
                           const Spacer(),
                           Icon(Icons.open_in_new,
                               size: 16,
