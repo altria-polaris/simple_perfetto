@@ -34,7 +34,6 @@ class RecorderScreen extends StatefulWidget {
 
 class _RecorderScreenState extends State<RecorderScreen> {
   double _durationMs = 10000;
-  final TextEditingController _bufferSizeController = TextEditingController();
   bool _autoBufferSize = true;
   bool _isButtonLocked = false;
 
@@ -59,20 +58,20 @@ class _RecorderScreenState extends State<RecorderScreen> {
       description: 'Standard gfx + window-manager hooks',
       atraceCategories: ['gfx', 'input', 'view', 'wm', 'am'],
     ),
-    RecordingMode(
-      label: 'Camera Tuning',
-      icon: Icons.camera_alt,
-      atraceCategories: [
-        'camera',
-        'hal',
-        'video',
-        'ion',
-        'gfx',
-        'sched',
-        'freq',
-        'idle'
-      ],
-    ),
+    // RecordingMode(
+    //   label: 'Camera Tuning',
+    //   icon: Icons.camera_alt,
+    //   atraceCategories: [
+    //     'camera',
+    //     'hal',
+    //     'video',
+    //     'ion',
+    //     'gfx',
+    //     'sched',
+    //     'freq',
+    //     'idle'
+    //   ],
+    // ),
     RecordingMode(
       label: 'Graphic Memory',
       icon: Icons.videogame_asset,
@@ -92,35 +91,35 @@ class _RecorderScreenState extends State<RecorderScreen> {
         'sync'
       ],
     ),
-    RecordingMode(
-      label: 'Show Touches (Example)',
-      icon: Icons.touch_app,
-      description: 'ADB: enable touch dots during recording',
-      onStart: (deviceId) async {
-        final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
-        await Process.run('adb', [
-          ...deviceArgs,
-          'shell',
-          'settings',
-          'put',
-          'system',
-          'show_touches',
-          '1'
-        ]);
-      },
-      onStop: (deviceId) async {
-        final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
-        await Process.run('adb', [
-          ...deviceArgs,
-          'shell',
-          'settings',
-          'put',
-          'system',
-          'show_touches',
-          '0'
-        ]);
-      },
-    )
+    // RecordingMode(
+    //   label: 'Show Touches (Example)',
+    //   icon: Icons.touch_app,
+    //   description: 'ADB: enable touch dots during recording',
+    //   onStart: (deviceId) async {
+    //     final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
+    //     await Process.run('adb', [
+    //       ...deviceArgs,
+    //       'shell',
+    //       'settings',
+    //       'put',
+    //       'system',
+    //       'show_touches',
+    //       '1'
+    //     ]);
+    //   },
+    //   onStop: (deviceId) async {
+    //     final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
+    //     await Process.run('adb', [
+    //       ...deviceArgs,
+    //       'shell',
+    //       'settings',
+    //       'put',
+    //       'system',
+    //       'show_touches',
+    //       '0'
+    //     ]);
+    //   },
+    // )
   ];
 
   String _formatDuration(int ms) {
@@ -140,10 +139,12 @@ class _RecorderScreenState extends State<RecorderScreen> {
     return '$m:$s.$ds';
   }
 
-  // Text Controllers
-  final TextEditingController _categoriesController = TextEditingController();
-  final TextEditingController _appNameController = TextEditingController();
-  final TextEditingController _outputFileController = TextEditingController();
+  // Input Controllers
+  final _atraceController = TextEditingController();
+  final _ftraceController = TextEditingController();
+  final _appNameController = TextEditingController();
+  final _outputFileController = TextEditingController();
+  final _bufferSizeController = TextEditingController();
 
   bool _autoGenerateFilename = true;
 
@@ -187,7 +188,10 @@ class _RecorderScreenState extends State<RecorderScreen> {
     _updateBufferSize();
     _refreshAdbDevices();
     // Listen to category text changes to update presets
-    _categoriesController.addListener(() {
+    _atraceController.addListener(() {
+      if (mounted) setState(() {});
+    });
+    _ftraceController.addListener(() {
       if (mounted) setState(() {});
     });
     _appNameController.addListener(() {
@@ -260,17 +264,16 @@ class _RecorderScreenState extends State<RecorderScreen> {
     'ftrace/print',
   ];
 
-  /// Parse user input from _categoriesController and split into
-  /// atrace categories (no slash) and ftrace events (contains slash).
-  List<String> _getUserTokens() {
-    return _categoriesController.text
+  /// Parse user input from a given controller
+  List<String> _getUserTokens(TextEditingController controller) {
+    return controller.text
         .trim()
         .split(RegExp(r'\s+'))
         .where((s) => s.isNotEmpty)
         .toList();
   }
 
-  /// All atrace categories = preset modes + user-entered tokens without '/'
+  /// All atrace categories
   Set<String> _getAtraceCategories() {
     final fromModes = <String>{};
     for (final mode in _recordingModes) {
@@ -278,13 +281,13 @@ class _RecorderScreenState extends State<RecorderScreen> {
         fromModes.addAll(mode.atraceCategories);
       }
     }
-    final fromUser = _getUserTokens().where((t) => !t.contains('/')).toSet();
+    final fromUser = _getUserTokens(_atraceController).toSet();
     return {...fromModes, ...fromUser};
   }
 
-  /// All ftrace events = defaults + user-entered tokens with '/'
+  /// All ftrace events
   Set<String> _getFtraceEvents() {
-    final fromUser = _getUserTokens().where((t) => t.contains('/')).toSet();
+    final fromUser = _getUserTokens(_ftraceController).toSet();
     return {..._defaultFtraceEvents, ...fromUser};
   }
 
@@ -384,6 +387,16 @@ data_sources: {
   // Start Recording
   Future<void> _startRecording() async {
     if (_isRecording) return;
+
+    // Validate ftrace inputs
+    final ftraceTokens = _getUserTokens(_ftraceController);
+    for (final token in ftraceTokens) {
+      if (!token.contains('/')) {
+        _updateStatus(
+            'Error: Ftrace event "$token" must be in "category/event" format.');
+        return;
+      }
+    }
 
     _lockButton();
     setState(() {
@@ -665,14 +678,55 @@ data_sources: {
     );
   }
 
+  Future<void> _fetchTopApp() async {
+    final deviceArgs =
+        _selectedDevice != null ? ['-s', _selectedDevice!] : <String>[];
+    _updateStatus('Fetching top app...');
+    try {
+      final result =
+          await Process.run('adb', [...deviceArgs, 'shell', 'dumpsys window']);
+      final out = result.stdout.toString();
+      final lines = out.split('\n');
+      String? topPkg;
+
+      // Look for mCurrentFocus=Window{... u0 com.package.name/ActivityName}
+      final focusRegExp = RegExp(r'mCurrentFocus=.*?\s+([a-zA-Z0-9_.-]+)/');
+
+      for (final line in lines) {
+        if (line.contains('mCurrentFocus=')) {
+          final match = focusRegExp.firstMatch(line);
+          if (match != null && match.group(1) != 'null') {
+            topPkg = match.group(1);
+            break; // mCurrentFocus is the most accurate
+          }
+        }
+      }
+
+      if (topPkg != null) {
+        setState(() {
+          if (_appNameController.text.isEmpty) {
+            _appNameController.text = topPkg!;
+          } else if (!_appNameController.text.contains(topPkg!)) {
+            _appNameController.text += ', $topPkg';
+          }
+        });
+        _updateStatus('Added $topPkg');
+      } else {
+        _updateStatus('Could not determine top app');
+      }
+    } catch (e) {
+      _updateStatus('Error: $e');
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
     _server?.close(force: true);
-    _categoriesController.dispose();
+    _atraceController.dispose();
+    _ftraceController.dispose();
     _appNameController.dispose();
     _outputFileController.dispose();
-    _bufferSizeController.dispose();
     super.dispose();
   }
 
@@ -858,7 +912,7 @@ data_sources: {
                     children: [
                       // Buffer Size (compact)
                       SizedBox(
-                        width: 125,
+                        width: 120,
                         child: TextField(
                           textAlign: TextAlign.right,
                           controller: _bufferSizeController,
@@ -876,7 +930,7 @@ data_sources: {
                               minHeight: 36,
                             ),
                             suffixIcon: IconButton(
-                              iconSize: 16,
+                              iconSize: 12,
                               constraints: const BoxConstraints(),
                               padding: EdgeInsets.zero,
                               icon: _autoBufferSize
@@ -971,30 +1025,51 @@ data_sources: {
                   ),
                   const SizedBox(height: 16),
 
-                  // Categories Inputs
+                  // Atrace Input
                   TextField(
-                    controller: _categoriesController,
-                    textAlignVertical: TextAlignVertical.top,
+                    controller: _atraceController,
                     style: const TextStyle(fontSize: 12),
                     decoration: const InputDecoration(
-                      labelText: "Additional Atrace/Ftrace events",
-                      alignLabelWithHint: true,
+                      labelText: "Additional Atrace categories",
+                      hintText: "e.g. memory gfx input",
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.category),
                       isDense: true,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const Spacer(),
+
+                  // Ftrace Input
+                  TextField(
+                    controller: _ftraceController,
+                    style: const TextStyle(fontSize: 12),
+                    decoration: const InputDecoration(
+                      labelText: "Additional Ftrace events",
+                      hintText: "e.g. sched/sched_switch",
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.settings_ethernet),
+                      isDense: true,
+                    ),
+                  ),
+                  const Spacer(),
 
                   // App Name Input
                   TextField(
                     controller: _appNameController,
                     style: const TextStyle(fontSize: 12),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: "User process/package names",
                       hintText: "e.g. com.example.app",
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.apps),
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.apps),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.ads_click),
+                        tooltip: "Get foreground app name",
+                        onPressed: _fetchTopApp,
+                      ),
                       isDense: true,
                     ),
                   ),
@@ -1086,9 +1161,6 @@ data_sources: {
                             ),
                           ],
                           const Spacer(),
-                          Icon(Icons.open_in_new,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.outline),
                         ],
                       ),
                     ),
