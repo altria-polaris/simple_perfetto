@@ -2,8 +2,21 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'l10n/app_localizations.dart';
+
+/// Describes an adb shell command to run in the background during recording.
+/// [shellCommand] is executed as `adb shell <shellCommand>`.
+/// [outputFileName] is an optional local filename to save output into (inside Traces/).
+class BackgroundCommand {
+  final String shellCommand;
+  final String? outputFileName;
+  const BackgroundCommand({
+    required this.shellCommand,
+    this.outputFileName,
+  });
+}
 
 class RecordingMode {
   final String label;
@@ -11,6 +24,9 @@ class RecordingMode {
   final String description;
   final List<String> atraceCategories;
   final List<String> ftraceEvents;
+
+  /// Optional long-running adb command kept alive for the duration of recording.
+  final BackgroundCommand? backgroundCommand;
   final Future<void> Function(String? deviceId)? onStart;
   final Future<void> Function(String? deviceId)? onStop;
 
@@ -20,6 +36,7 @@ class RecordingMode {
     this.description = '',
     this.atraceCategories = const [],
     this.ftraceEvents = const [],
+    this.backgroundCommand,
     this.onStart,
     this.onStop,
   });
@@ -91,6 +108,15 @@ class _RecorderScreenState extends State<RecorderScreen> {
         'sync'
       ],
     ),
+    RecordingMode(
+      label: 'Logcat',
+      icon: Icons.terminal,
+      description: 'Collect logcat output during recording',
+      backgroundCommand: BackgroundCommand(
+        shellCommand: 'logcat -v threadtime',
+        outputFileName: 'logcat.txt',
+      ),
+    ),
     // RecordingMode(
     //   label: 'Show Touches (Example)',
     //   icon: Icons.touch_app,
@@ -98,28 +124,16 @@ class _RecorderScreenState extends State<RecorderScreen> {
     //   onStart: (deviceId) async {
     //     final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
     //     await Process.run('adb', [
-    //       ...deviceArgs,
-    //       'shell',
-    //       'settings',
-    //       'put',
-    //       'system',
-    //       'show_touches',
-    //       '1'
+    //       ...deviceArgs, 'shell', 'settings', 'put', 'system', 'show_touches', '1'
     //     ]);
     //   },
     //   onStop: (deviceId) async {
     //     final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
     //     await Process.run('adb', [
-    //       ...deviceArgs,
-    //       'shell',
-    //       'settings',
-    //       'put',
-    //       'system',
-    //       'show_touches',
-    //       '0'
+    //       ...deviceArgs, 'shell', 'settings', 'put', 'system', 'show_touches', '0'
     //     ]);
     //   },
-    // )
+    // ),
   ];
 
   String _formatDuration(int ms) {
@@ -187,6 +201,12 @@ class _RecorderScreenState extends State<RecorderScreen> {
     _generateNewFilename();
     _updateBufferSize();
     _refreshAdbDevices();
+
+    _modesScrollController.addListener(_updateScrollGradient);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateScrollGradient();
+    });
+
     // Listen to category text changes to update presets
     _atraceController.addListener(() {
       if (mounted) setState(() {});
@@ -300,13 +320,37 @@ class _RecorderScreenState extends State<RecorderScreen> {
         .toSet();
   }
 
-  // Process State promt
+  // Process State
   bool _isRecording = false;
   bool _userStopped = false;
   Process? _recordingProcess;
   HttpServer? _server;
   Timer? _timer;
   int _elapsedMs = 0;
+
+  /// Background processes spawned by selected RecordingMode.backgroundCommand
+  final List<Process> _bgProcesses = [];
+
+  final ScrollController _modesScrollController = ScrollController();
+  bool _canScrollLeft = false;
+  bool _canScrollRight = false;
+
+  void _updateScrollGradient() {
+    if (!_modesScrollController.hasClients) return;
+    final pos = _modesScrollController.position;
+    final canLeft = pos.pixels > 0;
+    // maxScrollExtent could be 0 if items do not overflow
+    final canRight =
+        pos.pixels < pos.maxScrollExtent && pos.maxScrollExtent > 0;
+    if (_canScrollLeft != canLeft || _canScrollRight != canRight) {
+      if (mounted) {
+        setState(() {
+          _canScrollLeft = canLeft;
+          _canScrollRight = canRight;
+        });
+      }
+    }
+  }
 
   void _lockButton() {
     setState(() {
@@ -384,6 +428,65 @@ data_sources: {
 ''';
   }
 
+  // --- Background Command Helpers ---
+
+  /// Spawns all background commands for selected modes.
+  Future<void> _startBackgroundCommands() async {
+    final tracesDir = Directory('${Directory.current.path}\\Traces');
+    if (!await tracesDir.exists()) {
+      await tracesDir.create(recursive: true);
+    }
+    final deviceArgs =
+        _selectedDevice != null ? ['-s', _selectedDevice!] : <String>[];
+
+    for (final mode in _recordingModes) {
+      if (!_selectedModeLabels.contains(mode.label)) continue;
+      final cmd = mode.backgroundCommand;
+      if (cmd == null) continue;
+
+      IOSink? sink;
+      if (cmd.outputFileName != null) {
+        // Derive a unique filename: prepend trace basename
+        final base = _outputFileController.text.replaceAll('.pftrace', '');
+        final outPath = '${tracesDir.path}\\${base}_${cmd.outputFileName}';
+        final outFile = File(outPath);
+        sink = outFile.openWrite();
+      }
+
+      try {
+        final proc = await Process.start(
+          'adb',
+          [...deviceArgs, 'shell', cmd.shellCommand],
+          runInShell: false,
+        );
+
+        if (sink != null) {
+          // Pipe stdout/stderr → file
+          proc.stdout.listen((data) => sink!.add(data));
+          proc.stderr.listen((data) => sink!.add(data));
+          proc.exitCode.then((_) => sink!.close());
+        } else {
+          // No log file needed, drain streams to prevent deadlock
+          proc.stdout.drain();
+          proc.stderr.drain();
+        }
+
+        _bgProcesses.add(proc);
+      } catch (e) {
+        await sink?.close();
+        _updateStatus('Warning: could not start background command: $e');
+      }
+    }
+  }
+
+  /// Kills all background processes.
+  Future<void> _stopBackgroundCommands() async {
+    for (final proc in _bgProcesses) {
+      proc.kill();
+    }
+    _bgProcesses.clear();
+  }
+
   // Start Recording
   Future<void> _startRecording() async {
     if (_isRecording) return;
@@ -434,6 +537,9 @@ data_sources: {
 
       _updateStatus('Recording in progress...');
 
+      // Start background commands (logcat, etc.)
+      await _startBackgroundCommands();
+
       // Start Timer
       _elapsedMs = 0;
       _timer?.cancel();
@@ -456,6 +562,7 @@ data_sources: {
     } catch (e) {
       _updateStatus('Error starting process: $e');
     } finally {
+      await _stopBackgroundCommands();
       if (mounted) {
         setState(() {
           _isRecording = false;
@@ -470,6 +577,7 @@ data_sources: {
   Future<void> _stopRecording() async {
     _timer?.cancel();
     _lockButton();
+    await _stopBackgroundCommands();
     if (_recordingProcess != null) {
       _userStopped = true;
       _updateStatus('Stopping manually...');
@@ -548,7 +656,6 @@ data_sources: {
 
   // --- Categories Dialog ---
   void _showCategoriesDialog(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     final atraceCategories = _getAtraceCategories();
     final ftraceEvents = _getFtraceEvents();
     final atraceApps = _getAtraceApps();
@@ -564,14 +671,14 @@ data_sources: {
                 size: 20, color: Theme.of(ctx).colorScheme.primary),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(l10n.activeCategories,
+              child: Text('Activated Configs',
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.bold)),
             ),
             IconButton(
               icon: const Icon(Icons.close, size: 20),
               onPressed: () => Navigator.of(ctx).pop(),
-              tooltip: l10n.close,
+              tooltip: 'Close',
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
             ),
@@ -727,6 +834,7 @@ data_sources: {
     _ftraceController.dispose();
     _appNameController.dispose();
     _outputFileController.dispose();
+    _modesScrollController.dispose();
     super.dispose();
   }
 
@@ -926,16 +1034,16 @@ data_sources: {
                                 vertical: 8, horizontal: 12),
                             suffixText: 'MB',
                             suffixIconConstraints: const BoxConstraints(
-                              minWidth: 36,
-                              minHeight: 36,
+                              minWidth: 32,
+                              minHeight: 32,
                             ),
                             suffixIcon: IconButton(
-                              iconSize: 12,
+                              iconSize: 16,
                               constraints: const BoxConstraints(),
                               padding: EdgeInsets.zero,
                               icon: _autoBufferSize
-                                  ? const Icon(Icons.lock)
-                                  : const Icon(Icons.lock_open),
+                                  ? const Icon(Icons.auto_fix_normal)
+                                  : const Icon(Icons.auto_fix_off),
                               onPressed: () {
                                 setState(() {
                                   _autoBufferSize = !_autoBufferSize;
@@ -943,7 +1051,7 @@ data_sources: {
                                 });
                               },
                               tooltip: _autoBufferSize
-                                  ? 'Unlock to edit'
+                                  ? 'Unlock'
                                   : 'Lock to auto-calculate',
                             ),
                           ),
@@ -1005,22 +1113,98 @@ data_sources: {
                       splashFactory: NoSplash.splashFactory,
                       highlightColor: Colors.transparent,
                     ),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _recordingModes.map((m) {
-                        final label = m.label;
-                        final isSelected = _isModeSelected(label);
-                        return FilterChip(
-                          showCheckmark: false,
-                          avatar: Icon(m.icon, size: 16),
-                          label: Text(label),
-                          tooltip:
-                              m.description.isNotEmpty ? m.description : null,
-                          selected: isSelected,
-                          onSelected: (v) => _toggleMode(label, v),
-                        );
-                      }).toList(),
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context).copyWith(
+                        dragDevices: {
+                          PointerDeviceKind.touch,
+                          PointerDeviceKind.mouse,
+                        },
+                      ),
+                      child: Stack(
+                        children: [
+                          SingleChildScrollView(
+                            controller: _modesScrollController,
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: _recordingModes.map((m) {
+                                final label = m.label;
+                                final isSelected = _isModeSelected(label);
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: FilterChip(
+                                    showCheckmark: false,
+                                    avatar: Icon(m.icon, size: 16),
+                                    label: Text(label),
+                                    tooltip: m.description.isNotEmpty
+                                        ? m.description
+                                        : null,
+                                    selected: isSelected,
+                                    onSelected: (v) => _toggleMode(label, v),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                          if (_canScrollLeft)
+                            Positioned(
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              child: IgnorePointer(
+                                child: Container(
+                                  width: 40,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
+                                      colors: [
+                                        Theme.of(context).colorScheme.surface,
+                                        Theme.of(context)
+                                            .colorScheme
+                                            .surface
+                                            .withAlpha(0),
+                                      ],
+                                    ),
+                                  ),
+                                  alignment: Alignment.centerLeft,
+                                  child: Icon(Icons.chevron_left,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface),
+                                ),
+                              ),
+                            ),
+                          if (_canScrollRight)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              bottom: 0,
+                              child: IgnorePointer(
+                                child: Container(
+                                  width: 40,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.centerRight,
+                                      end: Alignment.centerLeft,
+                                      colors: [
+                                        Theme.of(context).colorScheme.surface,
+                                        Theme.of(context)
+                                            .colorScheme
+                                            .surface
+                                            .withAlpha(0),
+                                      ],
+                                    ),
+                                  ),
+                                  alignment: Alignment.centerRight,
+                                  child: Icon(Icons.chevron_right,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1030,8 +1214,8 @@ data_sources: {
                     controller: _atraceController,
                     style: const TextStyle(fontSize: 12),
                     decoration: const InputDecoration(
-                      labelText: "Additional Atrace categories",
-                      hintText: "e.g. memory gfx input",
+                      labelText: "Atrace categories",
+                      hintText: "e.g. memory gfx input am pm",
                       floatingLabelBehavior: FloatingLabelBehavior.always,
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.category),
@@ -1045,11 +1229,11 @@ data_sources: {
                     controller: _ftraceController,
                     style: const TextStyle(fontSize: 12),
                     decoration: const InputDecoration(
-                      labelText: "Additional Ftrace events",
-                      hintText: "e.g. sched/sched_switch",
+                      labelText: "Ftrace events",
+                      hintText: "e.g. sched/sched_switch irq/*",
                       floatingLabelBehavior: FloatingLabelBehavior.always,
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.settings_ethernet),
+                      prefixIcon: Icon(Icons.category_outlined),
                       isDense: true,
                     ),
                   ),
@@ -1065,10 +1249,25 @@ data_sources: {
                       floatingLabelBehavior: FloatingLabelBehavior.always,
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.apps),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.ads_click),
-                        tooltip: "Get foreground app name",
-                        onPressed: _fetchTopApp,
+                      suffixIcon: Tooltip(
+                        message: "Get foreground app name",
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(4),
+                          onTap: _fetchTopApp,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: const [
+                                Icon(Icons.add_to_home_screen, size: 16),
+                                SizedBox(width: 4),
+                                Text("Get Top App",
+                                    style: TextStyle(fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                       isDense: true,
                     ),
@@ -1092,12 +1291,9 @@ data_sources: {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.category,
-                              size: 18,
-                              color: Theme.of(context).colorScheme.primary),
                           const SizedBox(width: 8),
                           Text(
-                            '${l10n.activeCategories}:',
+                            'Activated configs: ',
                             style: const TextStyle(
                                 fontSize: 13, fontWeight: FontWeight.bold),
                           ),
