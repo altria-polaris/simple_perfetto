@@ -54,7 +54,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get simplifiedChinese => '简体中文';
 
   @override
-  String get themeModeSystem => 'System';
+  String get themeModeSystem => 'System Default';
 
   @override
   String get themeModeLight => 'Light';
@@ -105,27 +105,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openPerfetto => 'Open Perfetto';
 
   @override
-  String get quickPresets => 'Quick Presets';
-
-  @override
-  String get additionalEvents => 'Additional Atrace/Ftrace events';
-
-  @override
-  String get userProcessNames => 'User process/package names';
-
-  @override
-  String get userProcessHint => 'e.g. com.example.app';
-
-  @override
-  String get activeCategories => 'Active Categories';
-
-  @override
-  String get converterTitle => 'Perfetto Trace to Atrace';
-
-  @override
-  String get converterMessage => 'Perfetto Trace to Atrace Converter';
-
-  @override
   String get fontFamily => 'Roboto';
 
   @override
@@ -151,10 +130,4 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get version => 'Version';
-
-  @override
-  String get viewCategories => 'View Categories';
-
-  @override
-  String get close => 'Close';
 }

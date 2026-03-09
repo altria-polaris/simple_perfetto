@@ -105,27 +105,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openPerfetto => '開啟 Perfetto';
 
   @override
-  String get quickPresets => '快速預設';
-
-  @override
-  String get additionalEvents => '額外 Atrace/Ftrace 事件';
-
-  @override
-  String get userProcessNames => '使用者程序/套件名稱';
-
-  @override
-  String get userProcessHint => '例如 com.example.app';
-
-  @override
-  String get activeCategories => '啟用類別';
-
-  @override
-  String get converterTitle => 'Perfetto Trace 轉 Atrace';
-
-  @override
-  String get converterMessage => 'Perfetto Trace 轉 Atrace 轉換器';
-
-  @override
   String get fontFamily => 'Microsoft JhengHei UI';
 
   @override
@@ -151,12 +130,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get version => '版本';
-
-  @override
-  String get viewCategories => '檢視類別';
-
-  @override
-  String get close => '關閉';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -260,27 +233,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get openPerfetto => '打开 Perfetto';
 
   @override
-  String get quickPresets => '快速预设';
-
-  @override
-  String get additionalEvents => '额外 Atrace/Ftrace 事件';
-
-  @override
-  String get userProcessNames => '用户进程/包名';
-
-  @override
-  String get userProcessHint => '例如 com.example.app';
-
-  @override
-  String get activeCategories => '启用类别';
-
-  @override
-  String get converterTitle => 'Perfetto Trace 转 Atrace';
-
-  @override
-  String get converterMessage => 'Perfetto Trace 转 Atrace 转换器';
-
-  @override
   String get fontFamily => 'Microsoft JhengHei UI';
 
   @override
@@ -306,10 +258,4 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get version => '版本';
-
-  @override
-  String get viewCategories => '查看类别';
-
-  @override
-  String get close => '关闭';
 }

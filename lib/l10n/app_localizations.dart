@@ -189,7 +189,7 @@ abstract class AppLocalizations {
   /// No description provided for @themeModeSystem.
   ///
   /// In en, this message translates to:
-  /// **'System'**
+  /// **'System Default'**
   String get themeModeSystem;
 
   /// No description provided for @themeModeLight.
@@ -288,48 +288,6 @@ abstract class AppLocalizations {
   /// **'Open Perfetto'**
   String get openPerfetto;
 
-  /// No description provided for @quickPresets.
-  ///
-  /// In en, this message translates to:
-  /// **'Quick Presets'**
-  String get quickPresets;
-
-  /// No description provided for @additionalEvents.
-  ///
-  /// In en, this message translates to:
-  /// **'Additional Atrace/Ftrace events'**
-  String get additionalEvents;
-
-  /// No description provided for @userProcessNames.
-  ///
-  /// In en, this message translates to:
-  /// **'User process/package names'**
-  String get userProcessNames;
-
-  /// No description provided for @userProcessHint.
-  ///
-  /// In en, this message translates to:
-  /// **'e.g. com.example.app'**
-  String get userProcessHint;
-
-  /// No description provided for @activeCategories.
-  ///
-  /// In en, this message translates to:
-  /// **'Active Categories'**
-  String get activeCategories;
-
-  /// No description provided for @converterTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Perfetto Trace to Atrace'**
-  String get converterTitle;
-
-  /// No description provided for @converterMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Perfetto Trace to Atrace Converter'**
-  String get converterMessage;
-
   /// No description provided for @fontFamily.
   ///
   /// In en, this message translates to:
@@ -383,18 +341,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Version'**
   String get version;
-
-  /// No description provided for @viewCategories.
-  ///
-  /// In en, this message translates to:
-  /// **'View Categories'**
-  String get viewCategories;
-
-  /// No description provided for @close.
-  ///
-  /// In en, this message translates to:
-  /// **'Close'**
-  String get close;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
