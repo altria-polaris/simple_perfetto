@@ -8,7 +8,8 @@ import 'l10n/app_localizations.dart';
 import 'main.dart';
 
 // Todo: replace this with your actual Windows shared folder path
-const String _kUpdateUrl = r'D:\workspace\updater';  // or shared path like r'\\server\share\updates
+const String _kUpdateUrl =
+    r'D:\workspace\updater'; // or shared path like r'\\server\share\updates
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -22,21 +23,20 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.only(left: 12, right: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _SectionTitle(title: l10n.appearance),
-            const _AppearanceCard(),
-            const SizedBox(height: 8),
-            _SectionTitle(title: l10n.colorScheme),
-            const _ColorSeedCard(),
-            const SizedBox(height: 8),
-            _SectionTitle(title: l10n.updates),
-            const _UpdateSettingsCard(),
-            const SizedBox(height: 8),
-            _SectionTitle(title: l10n.actions),
-            const _ActionsCard(),
-          ]),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _SectionTitle(title: l10n.appearance),
+          const _AppearanceCard(),
+          const SizedBox(height: 8),
+          _SectionTitle(title: l10n.colorScheme),
+          const _ColorSeedCard(),
+          const SizedBox(height: 8),
+          _SectionTitle(title: l10n.updates),
+          const _UpdateSettingsCard(),
+          const SizedBox(height: 8),
+          _SectionTitle(title: l10n.actions),
+          const _ActionsCard(),
+        ]),
       ),
     );
   }
@@ -87,9 +87,15 @@ class _AppearanceCard extends StatelessWidget {
                         if (newMode != null) themeModeNotifier.value = newMode;
                       },
                       items: [
-                        DropdownMenuItem(value: ThemeMode.system, child: Text(l10n.themeModeSystem)),
-                        DropdownMenuItem(value: ThemeMode.light, child: Text(l10n.themeModeLight)),
-                        DropdownMenuItem(value: ThemeMode.dark, child: Text(l10n.themeModeDark)),
+                        DropdownMenuItem(
+                            value: ThemeMode.system,
+                            child: Text(l10n.themeModeSystem)),
+                        DropdownMenuItem(
+                            value: ThemeMode.light,
+                            child: Text(l10n.themeModeLight)),
+                        DropdownMenuItem(
+                            value: ThemeMode.dark,
+                            child: Text(l10n.themeModeDark)),
                       ],
                     );
                   },
@@ -111,7 +117,8 @@ class _AppearanceCard extends StatelessWidget {
                       const Locale('zh', 'TW'),
                       const Locale('zh', 'CN')
                     ];
-                    final dropdownValue = availableItems.contains(locale) ? locale : null;
+                    final dropdownValue =
+                        availableItems.contains(locale) ? locale : null;
 
                     return DropdownButton<Locale?>(
                       value: dropdownValue,
@@ -143,7 +150,9 @@ class _AppearanceCard extends StatelessWidget {
       case 'en':
         return l10n.english;
       case 'zh':
-        return locale.countryCode == 'TW' ? l10n.traditionalChinese : l10n.simplifiedChinese;
+        return locale.countryCode == 'TW'
+            ? l10n.traditionalChinese
+            : l10n.simplifiedChinese;
       default:
         return locale.toLanguageTag();
     }
@@ -183,7 +192,9 @@ class _ColorSeedCard extends StatelessWidget {
                       color: color,
                       shape: BoxShape.circle,
                       border: isSelected
-                          ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 3)
+                          ? Border.all(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              width: 3)
                           : null,
                       boxShadow: [
                         BoxShadow(
@@ -193,7 +204,9 @@ class _ColorSeedCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 24) : null,
+                    child: isSelected
+                        ? const Icon(Icons.check, color: Colors.white, size: 24)
+                        : null,
                   ),
                 );
               }).toList(),
@@ -221,7 +234,8 @@ class _ActionsCard extends StatelessWidget {
             onPressed: () => _showResetConfirmationDialog(context),
             style: OutlinedButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
-              side: BorderSide(color: Theme.of(context).colorScheme.error.withAlpha(128)),
+              side: BorderSide(
+                  color: Theme.of(context).colorScheme.error.withAlpha(128)),
             ),
           ),
         ),
@@ -243,7 +257,8 @@ class _ActionsCard extends StatelessWidget {
               onPressed: () => Navigator.of(dialogContext).pop(),
             ),
             TextButton(
-              child: Text(l10n.reset, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              child: Text(l10n.reset,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
               onPressed: () {
                 themeModeNotifier.value = ThemeMode.light;
                 colorSeedNotifier.value = Colors.blueGrey;
@@ -301,7 +316,8 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
     setState(() => _isCheckingForUpdate = true);
 
     try {
-      final versionJsonPath = '$updatePath${Platform.pathSeparator}version.json';
+      final versionJsonPath =
+          '$updatePath${Platform.pathSeparator}version.json';
       final versionFile = File(versionJsonPath);
 
       if (!await versionFile.exists()) {
@@ -316,7 +332,8 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
       final newVersionString = 'v$newVersion+$newBuild';
 
       final packageInfo = await PackageInfo.fromPlatform();
-      final currentVersionString = 'v${packageInfo.version}+${packageInfo.buildNumber}';
+      final currentVersionString =
+          'v${packageInfo.version}+${packageInfo.buildNumber}';
 
       if (!mounted) return;
 
@@ -325,10 +342,15 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
           context: context,
           builder: (context) => AlertDialog(
             title: Text(l10n.updateAvailable),
-            content: Text('New version $newVersionString is available. Current version is $currentVersionString.'),
+            content: Text(
+                'New version $newVersionString is available. Current version is $currentVersionString.'),
             actions: [
-              TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.cancel)),
-              TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.download)),
+              TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(l10n.cancel)),
+              TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text(l10n.download)),
             ],
           ),
         );
@@ -341,7 +363,8 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
       }
     } catch (e) {
       if (mounted) {
-        messenger.showSnackBar(SnackBar(content: Text('${l10n.errorCheckingUpdate}: $e')));
+        messenger.showSnackBar(
+            SnackBar(content: Text('${l10n.errorCheckingUpdate}: $e')));
       }
     } finally {
       if (mounted) {
@@ -350,7 +373,8 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
     }
   }
 
-  Future<void> _downloadAndInstallUpdate(Map<String, dynamic> versionInfo) async {
+  Future<void> _downloadAndInstallUpdate(
+      Map<String, dynamic> versionInfo) async {
     if (!mounted) return;
     final l10n = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
@@ -362,7 +386,8 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
     });
 
     try {
-      final zipPath = '$updatePath${Platform.pathSeparator}${versionInfo['path']}';
+      final zipPath =
+          '$updatePath${Platform.pathSeparator}${versionInfo['path']}';
       final zipFile = File(zipPath);
 
       if (!await zipFile.exists()) {
@@ -372,7 +397,8 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
       final tempDir = await getTemporaryDirectory();
 
       // Copy file locally to show progress, then unzip from local copy.
-      final localZipFile = File('${tempDir.path}${Platform.pathSeparator}update.zip');
+      final localZipFile =
+          File('${tempDir.path}${Platform.pathSeparator}update.zip');
       if (await localZipFile.exists()) {
         await localZipFile.delete();
       }
@@ -409,11 +435,14 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
 
       // Validate the update content to prevent breaking the installation.
       // The zip file must contain the executable at the root level.
-      final executableName = Platform.resolvedExecutable.split(Platform.pathSeparator).last;
-      final updateExe = File('$extractPath${Platform.pathSeparator}$executableName');
-      
+      final executableName =
+          Platform.resolvedExecutable.split(Platform.pathSeparator).last;
+      final updateExe =
+          File('$extractPath${Platform.pathSeparator}$executableName');
+
       if (!await updateExe.exists()) {
-        throw Exception('Invalid update package: $executableName not found. Please ensure you zipped the *files*, not the folder.');
+        throw Exception(
+            'Invalid update package: $executableName not found. Please ensure you zipped the *files*, not the folder.');
       }
 
       await localZipFile.delete(); // Clean up the copied zip
@@ -471,14 +500,17 @@ echo Update complete. Press any key to close this window.
             content: Text(
                 'Update has been prepared. Please close the app, replace files from "$updatePath", and restart.'),
             actions: [
-              TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+              TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK')),
             ],
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        messenger.showSnackBar(SnackBar(content: Text('Failed to perform update: $e')));
+        messenger.showSnackBar(
+            SnackBar(content: Text('Failed to perform update: $e')));
         setState(() => _isDownloading = false);
       }
     }
