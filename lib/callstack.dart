@@ -15,14 +15,28 @@ class CallStackScreen extends StatefulWidget {
 class _CallStackScreenState extends State<CallStackScreen> {
   // Config State
   double _durationMs = 10000;
-  final TextEditingController _targetProcessController = TextEditingController(text: 'systemui');
+  final TextEditingController _targetProcessController =
+      TextEditingController(text: 'com.android.settings');
   final TextEditingController _outputFileController = TextEditingController();
+  final TextEditingController _bufferSizeController = TextEditingController();
+  final TextEditingController _configController = TextEditingController();
+  final TextEditingController _frequencyController =
+      TextEditingController(text: '4000');
   bool _autoGenerateFilename = true;
+  bool _autoBufferSize = true;
   bool _isButtonLocked = false;
-  
-  // Config Toggles
-  bool _kernelFrames = true;
-  bool _scanAllProcesses = true;
+
+  // Duration steps for the slider
+  final List<int> _durationSteps = [
+    5000,
+    10000,
+    15000,
+    30000,
+    60000,
+    180000,
+    300000,
+    600000,
+  ];
 
   // ADB Devices
   List<String> _adbDevices = [];
@@ -40,7 +54,24 @@ class _CallStackScreenState extends State<CallStackScreen> {
   void initState() {
     super.initState();
     _generateNewFilename();
+    _updateBufferSize();
     _refreshAdbDevices();
+
+    // Auto-update config when parameters change
+    _targetProcessController.addListener(_onParamChanged);
+    _bufferSizeController.addListener(_onParamChanged);
+    _frequencyController.addListener(_onParamChanged);
+
+    // Initial config generation
+    _configController.text = _generateConfig();
+  }
+
+  void _onParamChanged() {
+    if (mounted) {
+      setState(() {
+        _configController.text = _generateConfig();
+      });
+    }
   }
 
   @override
@@ -49,6 +80,9 @@ class _CallStackScreenState extends State<CallStackScreen> {
     _server?.close(force: true);
     _targetProcessController.dispose();
     _outputFileController.dispose();
+    _bufferSizeController.dispose();
+    _configController.dispose();
+    _frequencyController.dispose();
     super.dispose();
   }
 
@@ -57,10 +91,32 @@ class _CallStackScreenState extends State<CallStackScreen> {
   void _generateNewFilename() {
     final now = DateTime.now();
     final random = Random();
-    final hex = random.nextInt(0x10000).toRadixString(16).toLowerCase().padLeft(4, '0');
+    final hex =
+        random.nextInt(0x10000).toRadixString(16).toLowerCase().padLeft(4, '0');
     String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final fileName = 'callstack_${now.year}-${twoDigits(now.month)}-${twoDigits(now.day)}_${twoDigits(now.hour)}-${twoDigits(now.minute)}_$hex.pftrace';
+    final fileName =
+        'callstack_${now.year}-${twoDigits(now.month)}-${twoDigits(now.day)}_${twoDigits(now.hour)}-${twoDigits(now.minute)}_$hex.pftrace';
     _outputFileController.text = fileName;
+  }
+
+  void _updateBufferSize() {
+    if (_autoBufferSize) {
+      final durationSec = _durationMs ~/ 1000;
+      int sizeMb;
+      if (durationSec <= 15) {
+        sizeMb = 64;
+      } else if (durationSec <= 30) {
+        sizeMb = 128;
+      } else if (durationSec <= 90) {
+        sizeMb = 256;
+      } else if (durationSec <= 300) {
+        sizeMb = 512;
+      } else {
+        sizeMb = 1024;
+      }
+      sizeMb = sizeMb.clamp(16, 4096);
+      _bufferSizeController.text = sizeMb.toString();
+    }
   }
 
   String _formatTimer(int ms) {
@@ -88,7 +144,8 @@ class _CallStackScreenState extends State<CallStackScreen> {
         }
         setState(() {
           _adbDevices = devices;
-          if (_selectedDevice == null || !_adbDevices.contains(_selectedDevice)) {
+          if (_selectedDevice == null ||
+              !_adbDevices.contains(_selectedDevice)) {
             _selectedDevice = _adbDevices.isNotEmpty ? _adbDevices.first : null;
           }
         });
@@ -102,7 +159,10 @@ class _CallStackScreenState extends State<CallStackScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating, duration: const Duration(seconds: 2)),
+      SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2)),
     );
   }
 
@@ -118,18 +178,21 @@ class _CallStackScreenState extends State<CallStackScreen> {
   String _generateConfig() {
     final duration = _durationMs.toInt();
     final target = _targetProcessController.text.trim();
-    // If target is empty, match everything (though this might be too verbose for callstacks)
-    final filterTerm = target.isNotEmpty ? '*$target*' : '*';
-    
-    // Construct filters based on the example
-    final switchFilter = 'prev_comm ~ \\"$filterTerm\\" || next_comm ~ \\"$filterTerm\\"';
-    final wakingFilter = 'comm ~ \\"$filterTerm\\"';
+    int bufferSizeKb = 102400;
+    try {
+      bufferSizeKb = int.parse(_bufferSizeController.text) * 1024;
+    } catch (_) {}
+
+    int frequency = 4000;
+    try {
+      frequency = int.parse(_frequencyController.text);
+    } catch (_) {}
 
     return '''
 duration_ms: $duration
 
 buffers: {
-  size_kb: 102400
+  size_kb: $bufferSizeKb
   fill_policy: DISCARD
 }
 
@@ -138,37 +201,15 @@ data_sources {
     name: "linux.perf"
     perf_event_config {
       timebase {
-        period: 1
-        tracepoint {
-          name: "sched/sched_switch"
-          filter: "$switchFilter"
-        }
+        frequency: $frequency
         timestamp_clock: PERF_CLOCK_MONOTONIC
       }
       callstack_sampling {
-        kernel_frames: $_kernelFrames
-      }
-      ring_buffer_pages: 2048
-    }
-  }
-}
-
-data_sources {
-  config {
-    name: "linux.perf"
-    perf_event_config {
-      timebase {
-        period: 1
-        tracepoint {
-          name: "sched/sched_waking"
-          filter: "$wakingFilter"
+        scope {
+          target_cmdline: "$target"
         }
-        timestamp_clock: PERF_CLOCK_MONOTONIC
+        kernel_frames: true
       }
-      callstack_sampling {
-        kernel_frames: $_kernelFrames
-      }
-      ring_buffer_pages: 2048
     }
   }
 }
@@ -182,15 +223,6 @@ data_sources: {
       atrace_categories: "dalvik"
       atrace_categories: "gfx"
       atrace_categories: "view"
-    }
-  }
-}
-
-data_sources: {
-  config: {
-    name: "linux.process_stats"
-    process_stats_config {
-      scan_all_processes_on_start: $_scanAllProcesses
     }
   }
 }
@@ -210,13 +242,23 @@ data_sources: {
     });
     _updateStatus('Starting Perfetto (CallStack)...');
 
-    final config = _generateConfig();
+    final config = _configController.text;
     final outputFile = _outputFileController.text;
     final deviceArgs = _selectedDevice != null ? ['-s', _selectedDevice!] : [];
 
     try {
       _recordingProcess = await Process.start(
-        'adb', [...deviceArgs, 'shell', 'perfetto', '-c', '-', '--txt', '-o', '"/data/misc/perfetto-traces/$outputFile"'],
+        'adb',
+        [
+          ...deviceArgs,
+          'shell',
+          'perfetto',
+          '-c',
+          '-',
+          '--txt',
+          '-o',
+          '"/data/misc/perfetto-traces/$outputFile"'
+        ],
       );
 
       _recordingProcess!.stdin.write(config);
@@ -224,7 +266,7 @@ data_sources: {
       await _recordingProcess!.stdin.close();
 
       _updateStatus('Recording in progress...');
-      
+
       _elapsedMs = 0;
       _timer?.cancel();
       _timer = Timer.periodic(const Duration(milliseconds: 100), (t) {
@@ -235,14 +277,13 @@ data_sources: {
       });
 
       final exitCode = await _recordingProcess!.exitCode;
-      
+
       if (exitCode == 0 || _userStopped) {
         _updateStatus('Recording finished. Pulling trace...');
         await _pullTraceFile(outputFile);
       } else {
         _updateStatus('Error: Perfetto exited with code $exitCode');
       }
-
     } catch (e) {
       _updateStatus('Error starting process: $e');
     } finally {
@@ -262,8 +303,10 @@ data_sources: {
     if (_recordingProcess != null) {
       _userStopped = true;
       _updateStatus('Stopping manually...');
-      final deviceArgs = _selectedDevice != null ? ['-s', _selectedDevice!] : [];
-      await Process.run('adb', [...deviceArgs, 'shell', 'killall', '-2', 'perfetto']);
+      final deviceArgs =
+          _selectedDevice != null ? ['-s', _selectedDevice!] : [];
+      await Process.run(
+          'adb', [...deviceArgs, 'shell', 'killall', '-2', 'perfetto']);
     }
   }
 
@@ -273,8 +316,14 @@ data_sources: {
       if (!await tracesDir.exists()) await tracesDir.create(recursive: true);
       final localPath = '${tracesDir.path}\\$traceName';
 
-      final deviceArgs = _selectedDevice != null ? ['-s', _selectedDevice!] : [];
-      final result = await Process.run('adb', [...deviceArgs, 'pull', '/data/misc/perfetto-traces/$traceName', localPath]);
+      final deviceArgs =
+          _selectedDevice != null ? ['-s', _selectedDevice!] : [];
+      final result = await Process.run('adb', [
+        ...deviceArgs,
+        'pull',
+        '/data/misc/perfetto-traces/$traceName',
+        localPath
+      ]);
       if (result.exitCode == 0) {
         _updateStatus('Success! Saved to $localPath');
       } else {
@@ -300,7 +349,8 @@ data_sources: {
     try {
       _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 9001);
       _server!.listen((HttpRequest request) async {
-        request.response.headers.add('Access-Control-Allow-Origin', 'https://ui.perfetto.dev');
+        request.response.headers
+            .add('Access-Control-Allow-Origin', 'https://ui.perfetto.dev');
         final encodedName = Uri.encodeComponent(fileName);
         if (request.uri.path == '/$encodedName') {
           final file = File(filePath);
@@ -312,13 +362,96 @@ data_sources: {
       });
 
       final encodedName = Uri.encodeComponent(fileName);
-      final url = 'https://ui.perfetto.dev/#!/?url=http://127.0.0.1:9001/$encodedName&referrer=record_android_trace';
+      final url =
+          'https://ui.perfetto.dev/#!/?url=http://127.0.0.1:9001/$encodedName&referrer=record_android_trace';
 
       Process.run('cmd', ['/c', 'start', url]);
       _updateStatus('Serving trace on port 9001...');
     } catch (e) {
       _updateStatus('Error starting server: $e');
     }
+  }
+
+  // --- Config Dialog ---
+  void _showConfigDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        titlePadding: const EdgeInsets.fromLTRB(20, 16, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        title: Row(
+          children: [
+            Icon(Icons.settings_applications,
+                size: 20, color: Theme.of(ctx).colorScheme.primary),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text('Perfetto Config (Editable)',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 20),
+              onPressed: () => Navigator.of(ctx).pop(),
+              tooltip: 'Close',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+            maxWidth: 500,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Manual edits here will be used for the next recording.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.grey.shade800),
+                  ),
+                  child: TextField(
+                    controller: _configController,
+                    maxLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    style: const TextStyle(
+                        color: Colors.greenAccent,
+                        fontFamily: 'monospace',
+                        fontSize: 12),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.all(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _configController.text = _generateConfig();
+              });
+            },
+            child: const Text('Reset to Default'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -335,7 +468,9 @@ data_sources: {
               isDense: true,
               menuMaxHeight: 300,
               hint: Text(l10n.noDevice, style: const TextStyle(fontSize: 12)),
-              items: _adbDevices.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+              items: _adbDevices
+                  .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                  .toList(),
               onChanged: (v) => setState(() => _selectedDevice = v),
             ),
           ),
@@ -362,11 +497,16 @@ data_sources: {
                         children: [
                           Text(
                             '${_formatTimer(_elapsedMs)} / ${_formatTimer(_durationMs.toInt())} m:s',
-                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                            style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'monospace'),
                           ),
                           const SizedBox(height: 8),
                           LinearProgressIndicator(
-                            value: (_durationMs > 0 && _isRecording) ? (_elapsedMs / _durationMs).clamp(0.0, 1.0) : 0,
+                            value: (_durationMs > 0 && _isRecording)
+                                ? (_elapsedMs / _durationMs).clamp(0.0, 1.0)
+                                : 0,
                             minHeight: 8,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -381,138 +521,250 @@ data_sources: {
                         child: ElevatedButton.icon(
                           label: Text(
                             _isRecording ? l10n.stop : l10n.start,
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _isRecording ? Colors.redAccent : Colors.blueAccent,
+                            backgroundColor: _isRecording
+                                ? Colors.redAccent
+                                : Colors.blueAccent,
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
                           ),
-                          onPressed: _isButtonLocked ? null : (_isRecording ? _stopRecording : _startRecording),
+                          onPressed: _isButtonLocked
+                              ? null
+                              : (_isRecording
+                                  ? _stopRecording
+                                  : _startRecording),
                         ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          
-          // Settings & Config Display
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Duration Slider
-                  Row(
+                const SizedBox(height: 8),
+
+                // Duration Slider
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackShape: const RectangularSliderTrackShape(),
+                    trackHeight: 2,
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    overlayShape:
+                        const RoundSliderOverlayShape(overlayRadius: 12),
+                  ),
+                  child: Row(
                     children: [
-                      const Icon(Icons.timer_outlined),
-                      Text('  ${l10n.maxDuration}: ${(_durationMs/1000).toStringAsFixed(0)}s', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const Icon(Icons.timer_outlined, size: 18),
+                      Text('  ${l10n.maxDuration}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13)),
                       Expanded(
                         child: Slider(
-                          value: _durationMs,
-                          min: 5000,
-                          max: 60000,
-                          divisions: 11,
-                          label: '${(_durationMs/1000).toInt()}s',
-                          onChanged: _isRecording ? null : (v) => setState(() => _durationMs = v),
+                          value: _durationSteps
+                              .indexOf(_durationMs.toInt())
+                              .toDouble(),
+                          min: 0,
+                          max: (_durationSteps.length - 1).toDouble(),
+                          divisions: _durationSteps.length - 1,
+                          label: '${(_durationMs / 1000).toInt()}s',
+                          onChanged: _isRecording
+                              ? null
+                              : (v) => setState(() {
+                                    _durationMs =
+                                        _durationSteps[v.toInt()].toDouble();
+                                    _updateBufferSize();
+                                    _configController.text = _generateConfig();
+                                  }),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                ),
 
-                  // Target Process Input
-                  TextField(
-                    controller: _targetProcessController,
-                    decoration: const InputDecoration(
-                      labelText: 'Target Process (Regex/Glob)',
-                      hintText: 'e.g. systemui',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.search),
-                      isDense: true,
+                // Output Trace File
+                TextField(
+                  controller: _outputFileController,
+                  readOnly: _autoGenerateFilename,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: l10n.outputTraceFile,
+                    border: const OutlineInputBorder(),
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    prefixIcon: _autoGenerateFilename
+                        ? const Icon(Icons.file_open, size: 18)
+                        : const Icon(Icons.edit_document, size: 18),
+                    suffixIcon: IconButton(
+                      iconSize: 16,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: _autoGenerateFilename
+                          ? const Icon(Icons.lock)
+                          : const Icon(Icons.lock_open),
+                      onPressed: () => setState(
+                          () => _autoGenerateFilename = !_autoGenerateFilename),
+                      tooltip: _autoGenerateFilename
+                          ? 'Unlock to edit'
+                          : 'Lock to auto-generate',
                     ),
-                    onChanged: (_) => setState(() {}),
+                    isDense: true,
                   ),
-                  const SizedBox(height: 8),
+                ),
+                const SizedBox(height: 12),
 
-                  // Toggles
-                  Row(
+                // Buffer Size + Action Buttons
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: SwitchListTile(
-                          title: const Text('Kernel Frames', style: TextStyle(fontSize: 14)),
-                          value: _kernelFrames,
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          onChanged: (v) => setState(() => _kernelFrames = v),
-                        ),
-                      ),
-                      Expanded(
-                        child: SwitchListTile(
-                          title: const Text('Scan All Procs', style: TextStyle(fontSize: 14)),
-                          value: _scanAllProcesses,
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          onChanged: (v) => setState(() => _scanAllProcesses = v),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Output File
-                  Row(
-                    children: [
-                      Expanded(
+                      SizedBox(
+                        width: 110,
                         child: TextField(
-                          controller: _outputFileController,
-                          readOnly: _autoGenerateFilename,
+                          textAlign: TextAlign.right,
+                          controller: _bufferSizeController,
+                          readOnly: _autoBufferSize,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(fontSize: 13),
                           decoration: InputDecoration(
-                            labelText: l10n.outputTraceFile,
-                            border: const OutlineInputBorder(),
+                            labelText: l10n.bufferSize,
                             isDense: true,
+                            border: const OutlineInputBorder(),
+                            contentPadding: const EdgeInsets.symmetric(
+                                vertical: 8, horizontal: 12),
+                            suffixText: 'MB',
                             suffixIcon: IconButton(
-                              icon: _autoGenerateFilename ? const Icon(Icons.lock) : const Icon(Icons.lock_open),
-                              onPressed: () => setState(() => _autoGenerateFilename = !_autoGenerateFilename),
+                              iconSize: 14,
+                              constraints: const BoxConstraints(),
+                              padding: EdgeInsets.zero,
+                              icon: _autoBufferSize
+                                  ? const Icon(Icons.auto_fix_normal)
+                                  : const Icon(Icons.auto_fix_off),
+                              onPressed: () => setState(() {
+                                _autoBufferSize = !_autoBufferSize;
+                                if (_autoBufferSize) _updateBufferSize();
+                              }),
+                              tooltip: _autoBufferSize
+                                  ? 'Unlock'
+                                  : 'Lock to auto-calculate',
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      IconButton.filledTonal(
-                        icon: const Icon(Icons.open_in_browser),
-                        tooltip: l10n.openPerfetto,
-                        onPressed: _openTraceInBrowser,
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.folder_open, size: 16),
+                          label: Text(l10n.openExplorer,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 13)),
+                          onPressed: () async {
+                            final tracesDir =
+                                Directory('${Directory.current.path}\\Traces');
+                            if (!await tracesDir.exists()) {
+                              await tracesDir.create(recursive: true);
+                            }
+                            final filePath =
+                                '${tracesDir.path}\\${_outputFileController.text}';
+                            if (File(filePath).existsSync()) {
+                              Process.start(
+                                  'explorer.exe', ['/select,', filePath]);
+                            } else {
+                              Process.start('explorer.exe', [tracesDir.path]);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.open_in_browser, size: 16),
+                          label: Text(l10n.openPerfetto,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 13)),
+                          onPressed: _openTraceInBrowser,
+                        ),
                       ),
                     ],
                   ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          // Settings Section
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _targetProcessController,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: const InputDecoration(
+                      labelText: 'Target Process (Cmdline)',
+                      hintText: 'e.g. com.android.settings',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.search, size: 18),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _frequencyController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: const InputDecoration(
+                      labelText: 'Frequency (Hz)',
+                      hintText: 'e.g. 4000',
+                      suffixText: 'samples/s',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.speed, size: 18),
+                      isDense: true,
+                    ),
+                  ),
                   const SizedBox(height: 16),
 
-                  // Config Preview
-                  const Text('Generated Config:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Expanded(
+                  // Config Dialog Trigger (Similar to Active Categories in Recorder)
+                  InkWell(
+                    onTap: () => _showConfigDialog(context),
+                    borderRadius: BorderRadius.circular(8),
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: Colors.grey),
+                        color:
+                            Theme.of(context).colorScheme.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: Theme.of(context).dividerColor),
                       ),
-                      child: SingleChildScrollView(
-                        child: Text(
-                          _generateConfig(),
-                          style: const TextStyle(
-                            color: Colors.greenAccent,
-                            fontFamily: 'monospace',
-                            fontSize: 12,
+                      child: Row(
+                        children: [
+                          const Icon(Icons.settings_applications, size: 20),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Perfetto configuration',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  'Click to manually edit generated configuration',
+                                  style: TextStyle(fontSize: 11),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ),
