@@ -454,25 +454,12 @@ data_sources: {
       appBar: AppBar(
         forceMaterialTransparency: true,
         title: Text(l10n.callStack),
-        actions: [
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedDevice,
-              isDense: true,
-              menuMaxHeight: 300,
-              hint: Text(l10n.noDevice, style: const TextStyle(fontSize: 12)),
-              items: _adbDevices
-                  .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedDevice = v),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshAdbDevices,
-            tooltip: l10n.refreshDevices,
-          ),
-        ],
+        actions: AdbDeviceSelector.asActions(
+          devices: _adbDevices,
+          selectedDevice: _selectedDevice,
+          onChanged: (v) => setState(() => _selectedDevice = v),
+          onRefresh: _refreshAdbDevices,
+        ),
       ),
       body: Column(
         children: [

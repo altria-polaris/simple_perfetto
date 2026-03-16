@@ -838,36 +838,12 @@ data_sources: {
       appBar: AppBar(
         forceMaterialTransparency: true,
         title: Text(l10n.appTitle),
-        actions: [
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedDevice,
-              isDense: true,
-              menuMaxHeight: 300,
-              hint: Text(l10n.noDevice, style: const TextStyle(fontSize: 12)),
-              selectedItemBuilder: (BuildContext context) {
-                return _adbDevices.map<Widget>((String item) {
-                  return Row(
-                    children: [
-                      const Icon(Icons.phone_android, size: 12),
-                      const SizedBox(width: 8),
-                      Text(item, style: const TextStyle(fontSize: 12)),
-                    ],
-                  );
-                }).toList();
-              },
-              items: _adbDevices
-                  .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedDevice = v),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refreshAdbDevices,
-            tooltip: l10n.refreshDevices,
-          ),
-        ],
+        actions: AdbDeviceSelector.asActions(
+          devices: _adbDevices,
+          selectedDevice: _selectedDevice,
+          onChanged: (v) => setState(() => _selectedDevice = v),
+          onRefresh: _refreshAdbDevices,
+        ),
       ),
       body: Column(
         children: [

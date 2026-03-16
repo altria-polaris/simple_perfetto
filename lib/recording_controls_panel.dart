@@ -323,3 +323,92 @@ Future<void> openExplorer(String? filePath, Directory fallbackDir) async {
     await Process.start('explorer.exe', [fallbackDir.path]);
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Shared AppBar actions widget for ADB device selection.
+///
+/// Renders a [DropdownButton] listing [devices] with a phone icon in the
+/// selected-item display, plus a refresh [IconButton].
+///
+/// Place this inside `AppBar.actions` via [AdbDeviceSelector.asActions]:
+/// ```dart
+/// AppBar(
+///   actions: AdbDeviceSelector.asActions(
+///     devices: _adbDevices,
+///     selectedDevice: _selectedDevice,
+///     onChanged: (v) => setState(() => _selectedDevice = v),
+///     onRefresh: _refreshAdbDevices,
+///   ),
+/// )
+/// ```
+class AdbDeviceSelector extends StatelessWidget {
+  const AdbDeviceSelector({
+    super.key,
+    required this.devices,
+    required this.selectedDevice,
+    required this.onChanged,
+    required this.onRefresh,
+  });
+
+  final List<String> devices;
+  final String? selectedDevice;
+  final ValueChanged<String?> onChanged;
+  final VoidCallback onRefresh;
+
+  /// Convenience constructor — returns the two widgets ready to drop into
+  /// `AppBar.actions`.
+  static List<Widget> asActions({
+    required List<String> devices,
+    required String? selectedDevice,
+    required ValueChanged<String?> onChanged,
+    required VoidCallback onRefresh,
+  }) {
+    return [
+      AdbDeviceSelector(
+        devices: devices,
+        selectedDevice: selectedDevice,
+        onChanged: onChanged,
+        onRefresh: onRefresh,
+      ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: selectedDevice,
+            isDense: true,
+            menuMaxHeight: 300,
+            hint: Text(l10n.noDevice, style: const TextStyle(fontSize: 12)),
+            selectedItemBuilder: (context) {
+              return devices.map<Widget>((item) {
+                return Row(
+                  children: [
+                    const Icon(Icons.phone_android, size: 12),
+                    const SizedBox(width: 8),
+                    Text(item, style: const TextStyle(fontSize: 12)),
+                  ],
+                );
+              }).toList();
+            },
+            items: devices
+                .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                .toList(),
+            onChanged: onChanged,
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          onPressed: onRefresh,
+          tooltip: l10n.refreshDevices,
+        ),
+      ],
+    );
+  }
+}
