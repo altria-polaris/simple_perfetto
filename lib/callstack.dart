@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'l10n/app_localizations.dart';
+import 'recording_controls_panel.dart';
 
 class CallStackScreen extends StatefulWidget {
   const CallStackScreen({super.key});
@@ -117,14 +118,6 @@ class _CallStackScreenState extends State<CallStackScreen> {
       sizeMb = sizeMb.clamp(16, 4096);
       _bufferSizeController.text = sizeMb.toString();
     }
-  }
-
-  String _formatTimer(int ms) {
-    final duration = Duration(milliseconds: ms);
-    final m = duration.inMinutes.toString().padLeft(2, '0');
-    final s = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    final ds = (duration.inMilliseconds % 1000 ~/ 100);
-    return '$m:$s.$ds';
   }
 
   Future<void> _refreshAdbDevices() async {
@@ -483,214 +476,37 @@ data_sources: {
       ),
       body: Column(
         children: [
-          // Top Section: Timer & Controls
-          Container(
-            padding: const EdgeInsets.all(12),
-            color: Theme.of(context).colorScheme.surfaceContainerLow,
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        children: [
-                          Text(
-                            '${_formatTimer(_elapsedMs)} / ${_formatTimer(_durationMs.toInt())} m:s',
-                            style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'monospace'),
-                          ),
-                          const SizedBox(height: 8),
-                          LinearProgressIndicator(
-                            value: (_durationMs > 0 && _isRecording)
-                                ? (_elapsedMs / _durationMs).clamp(0.0, 1.0)
-                                : 0,
-                            minHeight: 8,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      flex: 1,
-                      child: SizedBox(
-                        height: 48,
-                        child: ElevatedButton.icon(
-                          label: Text(
-                            _isRecording ? l10n.stop : l10n.start,
-                            style: const TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.bold),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isRecording
-                                ? Colors.redAccent
-                                : Colors.blueAccent,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
-                          ),
-                          onPressed: _isButtonLocked
-                              ? null
-                              : (_isRecording
-                                  ? _stopRecording
-                                  : _startRecording),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-
-                // Duration Slider
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackShape: const RectangularSliderTrackShape(),
-                    trackHeight: 2,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape:
-                        const RoundSliderOverlayShape(overlayRadius: 12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.timer_outlined, size: 18),
-                      Text('  ${l10n.maxDuration}',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 13)),
-                      Expanded(
-                        child: Slider(
-                          value: _durationSteps
-                              .indexOf(_durationMs.toInt())
-                              .toDouble(),
-                          min: 0,
-                          max: (_durationSteps.length - 1).toDouble(),
-                          divisions: _durationSteps.length - 1,
-                          label: '${(_durationMs / 1000).toInt()}s',
-                          onChanged: _isRecording
-                              ? null
-                              : (v) => setState(() {
-                                    _durationMs =
-                                        _durationSteps[v.toInt()].toDouble();
-                                    _updateBufferSize();
-                                    _configController.text = _generateConfig();
-                                  }),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Output Trace File
-                TextField(
-                  controller: _outputFileController,
-                  readOnly: _autoGenerateFilename,
-                  style: const TextStyle(fontSize: 13),
-                  decoration: InputDecoration(
-                    labelText: l10n.outputTraceFile,
-                    border: const OutlineInputBorder(),
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                    prefixIcon: _autoGenerateFilename
-                        ? const Icon(Icons.file_open, size: 18)
-                        : const Icon(Icons.edit_document, size: 18),
-                    suffixIcon: IconButton(
-                      iconSize: 16,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      icon: _autoGenerateFilename
-                          ? const Icon(Icons.lock)
-                          : const Icon(Icons.lock_open),
-                      onPressed: () => setState(
-                          () => _autoGenerateFilename = !_autoGenerateFilename),
-                      tooltip: _autoGenerateFilename
-                          ? 'Unlock to edit'
-                          : 'Lock to auto-generate',
-                    ),
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Buffer Size + Action Buttons
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(
-                        width: 110,
-                        child: TextField(
-                          textAlign: TextAlign.right,
-                          controller: _bufferSizeController,
-                          readOnly: _autoBufferSize,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(fontSize: 13),
-                          decoration: InputDecoration(
-                            labelText: l10n.bufferSize,
-                            isDense: true,
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(
-                                vertical: 8, horizontal: 12),
-                            suffixText: 'MB',
-                            suffixIcon: IconButton(
-                              iconSize: 14,
-                              constraints: const BoxConstraints(),
-                              padding: EdgeInsets.zero,
-                              icon: _autoBufferSize
-                                  ? const Icon(Icons.auto_fix_normal)
-                                  : const Icon(Icons.auto_fix_off),
-                              onPressed: () => setState(() {
-                                _autoBufferSize = !_autoBufferSize;
-                                if (_autoBufferSize) _updateBufferSize();
-                              }),
-                              tooltip: _autoBufferSize
-                                  ? 'Unlock'
-                                  : 'Lock to auto-calculate',
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.folder_open, size: 16),
-                          label: Text(l10n.openExplorer,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 13)),
-                          onPressed: () async {
-                            final tracesDir =
-                                Directory('${Directory.current.path}\\Traces');
-                            if (!await tracesDir.exists()) {
-                              await tracesDir.create(recursive: true);
-                            }
-                            final filePath =
-                                '${tracesDir.path}\\${_outputFileController.text}';
-                            if (File(filePath).existsSync()) {
-                              Process.start(
-                                  'explorer.exe', ['/select,', filePath]);
-                            } else {
-                              Process.start('explorer.exe', [tracesDir.path]);
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.open_in_browser, size: 16),
-                          label: Text(l10n.openPerfetto,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 13)),
-                          onPressed: _openTraceInBrowser,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          // Top Section: Shared Recording Controls
+          RecordingControlsPanel(
+            elapsedMs: _elapsedMs,
+            durationMs: _durationMs,
+            isRecording: _isRecording,
+            isButtonLocked: _isButtonLocked,
+            durationSteps: _durationSteps,
+            onDurationChanged: (v) => setState(() {
+              _durationMs = v;
+              _updateBufferSize();
+              _configController.text = _generateConfig();
+            }),
+            outputFileController: _outputFileController,
+            autoGenerateFilename: _autoGenerateFilename,
+            onToggleAutoFilename: () =>
+                setState(() => _autoGenerateFilename = !_autoGenerateFilename),
+            bufferSizeController: _bufferSizeController,
+            autoBufferSize: _autoBufferSize,
+            onToggleAutoBuffer: () => setState(() {
+              _autoBufferSize = !_autoBufferSize;
+              if (_autoBufferSize) _updateBufferSize();
+            }),
+            onStart: _startRecording,
+            onStop: _stopRecording,
+            onOpenExplorer: () async {
+              final tracesDir = Directory('${Directory.current.path}\\Traces');
+              final filePath =
+                  '${tracesDir.path}\\${_outputFileController.text}';
+              await openExplorer(filePath, tracesDir);
+            },
+            onOpenPerfetto: _openTraceInBrowser,
           ),
           const Divider(height: 1),
 
@@ -701,6 +517,8 @@ data_sources: {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  _buildSectionTitle('Sampling Settings'),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: _targetProcessController,
                     style: const TextStyle(fontSize: 13),
@@ -773,6 +591,17 @@ data_sources: {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4.0),
+      child: Text(
+        title,
+        style: const TextStyle(
+            color: Colors.grey, fontSize: 14, fontWeight: FontWeight.bold),
       ),
     );
   }
