@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'recording_controls_panel.dart';
 import 'target_app_input.dart';
+import 'l10n/app_localizations.dart';
 
 class CallStackScreen extends StatefulWidget {
   const CallStackScreen({super.key});
@@ -147,18 +148,21 @@ class _CallStackScreenState extends State<CallStackScreen> {
         });
       }
     } catch (e) {
-      _updateStatus('Error getting devices: $e');
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
+      _updateStatus(l10n.errorGettingDevices(e.toString()));
     }
   }
 
-  void _updateStatus(String message) {
+  void _updateStatus(String message,
+      {Duration duration = const Duration(seconds: 2)}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content: Text(message),
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2)),
+          duration: duration),
     );
   }
 
@@ -231,12 +235,13 @@ data_sources: {
     if (_isRecording) return;
 
     _lockButton();
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _isRecording = true;
       _userStopped = false;
       if (_autoGenerateFilename) _generateNewFilename();
     });
-    _updateStatus('Starting Perfetto (CallStack)...');
+    _updateStatus(l10n.startingCallstack);
 
     final config = _configController.text;
     final outputFile = _outputFileController.text;
@@ -261,7 +266,7 @@ data_sources: {
       await _recordingProcess!.stdin.flush();
       await _recordingProcess!.stdin.close();
 
-      _updateStatus('Recording in progress...');
+      _updateStatus(l10n.recordingInProgress);
 
       _elapsedMs = 0;
       _timer?.cancel();
@@ -275,13 +280,13 @@ data_sources: {
       final exitCode = await _recordingProcess!.exitCode;
 
       if (exitCode == 0 || _userStopped) {
-        _updateStatus('Recording finished. Pulling trace...');
+        _updateStatus(l10n.recordingFinishedPulling);
         await _pullTraceFile(outputFile);
       } else {
-        _updateStatus('Error: Perfetto exited with code $exitCode');
+        _updateStatus(l10n.perfettoError(exitCode.toString()));
       }
     } catch (e) {
-      _updateStatus('Error starting process: $e');
+      _updateStatus(l10n.errorStartingProcess(e.toString()));
     } finally {
       if (mounted) {
         setState(() {
@@ -298,7 +303,8 @@ data_sources: {
     _lockButton();
     if (_recordingProcess != null) {
       _userStopped = true;
-      _updateStatus('Stopping manually...');
+      _updateStatus(AppLocalizations.of(context)!.stoppingManually,
+          duration: const Duration(seconds: 1));
       final deviceArgs =
           _selectedDevice != null ? ['-s', _selectedDevice!] : [];
       await Process.run(
@@ -320,13 +326,17 @@ data_sources: {
         '/data/misc/perfetto-traces/$traceName',
         localPath
       ]);
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
       if (result.exitCode == 0) {
-        _updateStatus('Success! Saved to $localPath');
+        _updateStatus(l10n.successSavedTo(localPath));
       } else {
-        _updateStatus('Pull failed: ${result.stderr}');
+        _updateStatus(l10n.pullFailed(result.stderr.toString()));
       }
     } catch (e) {
-      _updateStatus('Error pulling file: $e');
+      if (!mounted) return;
+      _updateStatus(
+          AppLocalizations.of(context)!.errorPullingFile(e.toString()));
     }
   }
 
@@ -334,9 +344,11 @@ data_sources: {
     final fileName = _outputFileController.text;
     final tracesDir = Directory('${Directory.current.path}\\Traces');
     final filePath = '${tracesDir.path}\\$fileName';
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
 
     if (!File(filePath).existsSync()) {
-      _updateStatus('File not found: $fileName');
+      _updateStatus(l10n.fileNotFound(fileName));
       return;
     }
 
@@ -362,9 +374,9 @@ data_sources: {
           'https://ui.perfetto.dev/#!/?url=http://127.0.0.1:9001/$encodedName&referrer=record_android_trace';
 
       Process.run('cmd', ['/c', 'start', url]);
-      _updateStatus('Serving trace on port 9001...');
+      _updateStatus(l10n.servingTrace);
     } catch (e) {
-      _updateStatus('Error starting server: $e');
+      _updateStatus(l10n.errorStartingServer(e.toString()));
     }
   }
 
@@ -401,9 +413,9 @@ data_sources: {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Manual edits here will be used for the next recording.',
-                style: TextStyle(fontSize: 12, color: Colors.black87),
+              Text(
+                AppLocalizations.of(context)!.manualEditsHint,
+                style: const TextStyle(fontSize: 12, color: Colors.black87),
               ),
               const SizedBox(height: 12),
               Expanded(

@@ -130,4 +130,86 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get version => 'Version';
+
+  @override
+  String get recordingInProgress => 'Recording in progress...';
+
+  @override
+  String get startingPerfetto => 'Starting Perfetto...';
+
+  @override
+  String get startingCallstack => 'Starting Perfetto (Callstack)...';
+
+  @override
+  String get recordingFinishedPulling => 'Recording finished. Pulling trace...';
+
+  @override
+  String get stoppingManually => 'Stopping manually...';
+
+  @override
+  String successSavedTo(Object path) {
+    return 'Success! Saved to $path';
+  }
+
+  @override
+  String pullFailed(Object error) {
+    return 'Pull failed: $error';
+  }
+
+  @override
+  String errorStartingProcess(Object error) {
+    return 'Error starting process: $error';
+  }
+
+  @override
+  String perfettoError(Object code) {
+    return 'Error: Perfetto exited with code $code';
+  }
+
+  @override
+  String errorPullingFile(Object error) {
+    return 'Error pulling file: $error';
+  }
+
+  @override
+  String errorGettingDevices(Object error) {
+    return 'Error getting devices: $error';
+  }
+
+  @override
+  String ftraceFormatError(Object token) {
+    return 'Error: Ftrace event \"$token\" must be in \"category/event\" format.';
+  }
+
+  @override
+  String fileNotFound(Object filename) {
+    return 'File not found: $filename';
+  }
+
+  @override
+  String get servingTrace => 'Serving trace on port 9001...';
+
+  @override
+  String errorStartingServer(Object error) {
+    return 'Error starting server: $error';
+  }
+
+  @override
+  String get fetchingTopApp => 'Fetching top app...';
+
+  @override
+  String addedApp(Object app) {
+    return 'Added $app';
+  }
+
+  @override
+  String get couldNotDetermineTopApp => 'Could not determine top app';
+
+  @override
+  String genericError(Object error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get manualEditsHint => 'Manual edits here will be used for the next recording.';
 }

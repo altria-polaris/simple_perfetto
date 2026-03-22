@@ -81,7 +81,7 @@ class TargetAppInput extends StatelessWidget {
                 children: const [
                   Icon(Icons.add_to_home_screen, size: 16),
                   SizedBox(width: 4),
-                  Text("Get Top App", style: TextStyle(fontSize: 12)),
+                  Text("get top APP", style: TextStyle(fontSize: 12)),
                 ],
               ),
             ),

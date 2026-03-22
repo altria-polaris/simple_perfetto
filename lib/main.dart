@@ -56,7 +56,7 @@ Future<void> main() async {
       .firstWhere((e) => e.name == themeModeName, orElse: () => ThemeMode.dark);
 
   // Load ColorSeed
-  final colorValue = prefs.getInt('colorSeed') ?? Colors.blueGrey.value;
+  final colorValue = prefs.getInt('colorSeed') ?? Colors.blueGrey.toARGB32();
   colorSeedNotifier.value = Color(colorValue);
 
   // Load Locale

@@ -109,12 +109,14 @@ class RecordingControlsPanel extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${fmt(elapsedMs)} / ${fmt(durationMs.toInt())} m:s',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'monospace',
+                    Center(
+                      child: Text(
+                        '${fmt(elapsedMs)} / ${fmt(durationMs.toInt())} m:s',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -266,7 +268,7 @@ class RecordingControlsPanel extends StatelessWidget {
                             : const Icon(Icons.auto_fix_off),
                         onPressed: isRecording ? null : onToggleAutoBuffer,
                         tooltip: autoBufferSize
-                            ? 'Unlock'
+                            ? 'Unlock to edit'
                             : 'Lock to auto-calculate',
                       ),
                     ),

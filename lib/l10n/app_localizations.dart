@@ -341,6 +341,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Version'**
   String get version;
+
+  /// No description provided for @recordingInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording in progress...'**
+  String get recordingInProgress;
+
+  /// No description provided for @startingPerfetto.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting Perfetto...'**
+  String get startingPerfetto;
+
+  /// No description provided for @startingCallstack.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting Perfetto (Callstack)...'**
+  String get startingCallstack;
+
+  /// No description provided for @recordingFinishedPulling.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording finished. Pulling trace...'**
+  String get recordingFinishedPulling;
+
+  /// No description provided for @stoppingManually.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopping manually...'**
+  String get stoppingManually;
+
+  /// No description provided for @successSavedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Success! Saved to {path}'**
+  String successSavedTo(Object path);
+
+  /// No description provided for @pullFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Pull failed: {error}'**
+  String pullFailed(Object error);
+
+  /// No description provided for @errorStartingProcess.
+  ///
+  /// In en, this message translates to:
+  /// **'Error starting process: {error}'**
+  String errorStartingProcess(Object error);
+
+  /// No description provided for @perfettoError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: Perfetto exited with code {code}'**
+  String perfettoError(Object code);
+
+  /// No description provided for @errorPullingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Error pulling file: {error}'**
+  String errorPullingFile(Object error);
+
+  /// No description provided for @errorGettingDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Error getting devices: {error}'**
+  String errorGettingDevices(Object error);
+
+  /// No description provided for @ftraceFormatError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: Ftrace event \"{token}\" must be in \"category/event\" format.'**
+  String ftraceFormatError(Object token);
+
+  /// No description provided for @fileNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'File not found: {filename}'**
+  String fileNotFound(Object filename);
+
+  /// No description provided for @servingTrace.
+  ///
+  /// In en, this message translates to:
+  /// **'Serving trace on port 9001...'**
+  String get servingTrace;
+
+  /// No description provided for @errorStartingServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Error starting server: {error}'**
+  String errorStartingServer(Object error);
+
+  /// No description provided for @fetchingTopApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetching top app...'**
+  String get fetchingTopApp;
+
+  /// No description provided for @addedApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {app}'**
+  String addedApp(Object app);
+
+  /// No description provided for @couldNotDetermineTopApp.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not determine top app'**
+  String get couldNotDetermineTopApp;
+
+  /// No description provided for @genericError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String genericError(Object error);
+
+  /// No description provided for @manualEditsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual edits here will be used for the next recording.'**
+  String get manualEditsHint;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

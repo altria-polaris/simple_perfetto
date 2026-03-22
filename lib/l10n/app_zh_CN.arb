@@ -81,5 +81,80 @@
     "errorCheckingUpdate": "检查更新时发生错误",
     "@errorCheckingUpdate": {},
     "version": "版本",
-    "@version": {}
+    "@version": {},
+    "recordingInProgress": "正在录制中...",
+    "startingPerfetto": "正在启动 Perfetto...",
+    "startingCallstack": "正在启动 Perfetto (CallStack)...",
+    "recordingFinishedPulling": "录制完成。正在传输文件...",
+    "stoppingManually": "正在手动停止...",
+    "successSavedTo": "成功！已保存至 {path}",
+    "@successSavedTo": {
+        "placeholders": {
+            "path": {}
+        }
+    },
+    "pullFailed": "传输失败: {error}",
+    "@pullFailed": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "errorStartingProcess": "启动程序失败: {error}",
+    "@errorStartingProcess": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "perfettoError": "错误: Perfetto 以代码 {code} 结束",
+    "@perfettoError": {
+        "placeholders": {
+            "code": {}
+        }
+    },
+    "errorPullingFile": "抓取文件失败: {error}",
+    "@errorPullingFile": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "errorGettingDevices": "获取设备列表失败: {error}",
+    "@errorGettingDevices": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "ftraceFormatError": "错误: Ftrace 事件 \"{token}\" 必须符合 \"category/event\" 格式。",
+    "@ftraceFormatError": {
+        "placeholders": {
+            "token": {}
+        }
+    },
+    "fileNotFound": "找不到文件: {filename}",
+    "@fileNotFound": {
+        "placeholders": {
+            "filename": {}
+        }
+    },
+    "servingTrace": "正通过端口9001启动Trace...",
+    "errorStartingServer": "启动服务器失败: {error}",
+    "@errorStartingServer": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "fetchingTopApp": "正在获取前景APP名称...",
+    "addedApp": "已加入 {app}",
+    "@addedApp": {
+        "placeholders": {
+            "app": {}
+        }
+    },
+    "couldNotDetermineTopApp": "无法获取前景APP名称",
+    "genericError": "错误: {error}",
+    "@genericError": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "manualEditsHint": "此处的手动编辑将用于下一次录制。"
 }

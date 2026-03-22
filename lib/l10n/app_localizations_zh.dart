@@ -130,6 +130,88 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get version => '版本';
+
+  @override
+  String get recordingInProgress => '正在錄製中...';
+
+  @override
+  String get startingPerfetto => '正在啟動 Perfetto...';
+
+  @override
+  String get startingCallstack => '正在啟動 Perfetto (CallStack)...';
+
+  @override
+  String get recordingFinishedPulling => '錄製完成。正在傳輸檔案...';
+
+  @override
+  String get stoppingManually => '正在手動停止...';
+
+  @override
+  String successSavedTo(Object path) {
+    return '成功！已儲存至 $path';
+  }
+
+  @override
+  String pullFailed(Object error) {
+    return '傳輸失敗: $error';
+  }
+
+  @override
+  String errorStartingProcess(Object error) {
+    return '啟動程序失敗: $error';
+  }
+
+  @override
+  String perfettoError(Object code) {
+    return '錯誤: Perfetto 以代碼 $code 結束';
+  }
+
+  @override
+  String errorPullingFile(Object error) {
+    return '抓取檔案失敗: $error';
+  }
+
+  @override
+  String errorGettingDevices(Object error) {
+    return '取得裝置清單失敗: $error';
+  }
+
+  @override
+  String ftraceFormatError(Object token) {
+    return '錯誤: Ftrace 事件 \"$token\" 必須符合 \"category/event\" 格式。';
+  }
+
+  @override
+  String fileNotFound(Object filename) {
+    return '找不到檔案: $filename';
+  }
+
+  @override
+  String get servingTrace => '正透過連接埠9001開啟Trace...';
+
+  @override
+  String errorStartingServer(Object error) {
+    return '啟動伺服器失敗: $error';
+  }
+
+  @override
+  String get fetchingTopApp => '正在取得前景APP名稱...';
+
+  @override
+  String addedApp(Object app) {
+    return '已加入 $app';
+  }
+
+  @override
+  String get couldNotDetermineTopApp => '無法取得前景APP名稱';
+
+  @override
+  String genericError(Object error) {
+    return '錯誤: $error';
+  }
+
+  @override
+  String get manualEditsHint => '此處的手動編輯將用於下一次錄製。';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -258,4 +340,86 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get version => '版本';
+
+  @override
+  String get recordingInProgress => '正在录制中...';
+
+  @override
+  String get startingPerfetto => '正在启动 Perfetto...';
+
+  @override
+  String get startingCallstack => '正在启动 Perfetto (CallStack)...';
+
+  @override
+  String get recordingFinishedPulling => '录制完成。正在传输文件...';
+
+  @override
+  String get stoppingManually => '正在手动停止...';
+
+  @override
+  String successSavedTo(Object path) {
+    return '成功！已保存至 $path';
+  }
+
+  @override
+  String pullFailed(Object error) {
+    return '传输失败: $error';
+  }
+
+  @override
+  String errorStartingProcess(Object error) {
+    return '启动程序失败: $error';
+  }
+
+  @override
+  String perfettoError(Object code) {
+    return '错误: Perfetto 以代码 $code 结束';
+  }
+
+  @override
+  String errorPullingFile(Object error) {
+    return '抓取文件失败: $error';
+  }
+
+  @override
+  String errorGettingDevices(Object error) {
+    return '获取设备列表失败: $error';
+  }
+
+  @override
+  String ftraceFormatError(Object token) {
+    return '错误: Ftrace 事件 \"$token\" 必须符合 \"category/event\" 格式。';
+  }
+
+  @override
+  String fileNotFound(Object filename) {
+    return '找不到文件: $filename';
+  }
+
+  @override
+  String get servingTrace => '正通过端口9001启动Trace...';
+
+  @override
+  String errorStartingServer(Object error) {
+    return '启动服务器失败: $error';
+  }
+
+  @override
+  String get fetchingTopApp => '正在获取前景APP名称...';
+
+  @override
+  String addedApp(Object app) {
+    return '已加入 $app';
+  }
+
+  @override
+  String get couldNotDetermineTopApp => '无法获取前景APP名称';
+
+  @override
+  String genericError(Object error) {
+    return '错误: $error';
+  }
+
+  @override
+  String get manualEditsHint => '此处的手动编辑将用于下一次录制。';
 }

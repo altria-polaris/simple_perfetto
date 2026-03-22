@@ -81,5 +81,80 @@
     "errorCheckingUpdate": "檢查更新時發生錯誤",
     "@errorCheckingUpdate": {},
     "version": "版本",
-    "@version": {}
+    "@version": {},
+    "recordingInProgress": "正在錄製中...",
+    "startingPerfetto": "正在啟動 Perfetto...",
+    "startingCallstack": "正在啟動 Perfetto (CallStack)...",
+    "recordingFinishedPulling": "錄製完成。正在傳輸檔案...",
+    "stoppingManually": "正在手動停止...",
+    "successSavedTo": "成功！已儲存至 {path}",
+    "@successSavedTo": {
+        "placeholders": {
+            "path": {}
+        }
+    },
+    "pullFailed": "傳輸失敗: {error}",
+    "@pullFailed": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "errorStartingProcess": "啟動程序失敗: {error}",
+    "@errorStartingProcess": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "perfettoError": "錯誤: Perfetto 以代碼 {code} 結束",
+    "@perfettoError": {
+        "placeholders": {
+            "code": {}
+        }
+    },
+    "errorPullingFile": "抓取檔案失敗: {error}",
+    "@errorPullingFile": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "errorGettingDevices": "取得裝置清單失敗: {error}",
+    "@errorGettingDevices": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "ftraceFormatError": "錯誤: Ftrace 事件 \"{token}\" 必須符合 \"category/event\" 格式。",
+    "@ftraceFormatError": {
+        "placeholders": {
+            "token": {}
+        }
+    },
+    "fileNotFound": "找不到檔案: {filename}",
+    "@fileNotFound": {
+        "placeholders": {
+            "filename": {}
+        }
+    },
+    "servingTrace": "正透過連接埠9001開啟Trace...",
+    "errorStartingServer": "啟動伺服器失敗: {error}",
+    "@errorStartingServer": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "fetchingTopApp": "正在取得前景APP名稱...",
+    "addedApp": "已加入 {app}",
+    "@addedApp": {
+        "placeholders": {
+            "app": {}
+        }
+    },
+    "couldNotDetermineTopApp": "無法取得前景APP名稱",
+    "genericError": "錯誤: {error}",
+    "@genericError": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "manualEditsHint": "此處的手動編輯將用於下一次錄製。"
 }

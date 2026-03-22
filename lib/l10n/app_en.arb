@@ -81,5 +81,80 @@
     "errorCheckingUpdate": "Error checking for update",
     "@errorCheckingUpdate": {},
     "version": "Version",
-    "@version": {}
+    "@version": {},
+    "recordingInProgress": "Recording in progress...",
+    "startingPerfetto": "Starting Perfetto...",
+    "startingCallstack": "Starting Perfetto (Callstack)...",
+    "recordingFinishedPulling": "Recording finished. Pulling trace...",
+    "stoppingManually": "Stopping manually...",
+    "successSavedTo": "Success! Saved to {path}",
+    "@successSavedTo": {
+        "placeholders": {
+            "path": {}
+        }
+    },
+    "pullFailed": "Pull failed: {error}",
+    "@pullFailed": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "errorStartingProcess": "Error starting process: {error}",
+    "@errorStartingProcess": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "perfettoError": "Error: Perfetto exited with code {code}",
+    "@perfettoError": {
+        "placeholders": {
+            "code": {}
+        }
+    },
+    "errorPullingFile": "Error pulling file: {error}",
+    "@errorPullingFile": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "errorGettingDevices": "Error getting devices: {error}",
+    "@errorGettingDevices": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "ftraceFormatError": "Error: Ftrace event \"{token}\" must be in \"category/event\" format.",
+    "@ftraceFormatError": {
+        "placeholders": {
+            "token": {}
+        }
+    },
+    "fileNotFound": "File not found: {filename}",
+    "@fileNotFound": {
+        "placeholders": {
+            "filename": {}
+        }
+    },
+    "servingTrace": "Serving trace on port 9001...",
+    "errorStartingServer": "Error starting server: {error}",
+    "@errorStartingServer": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "fetchingTopApp": "Fetching top app...",
+    "addedApp": "Added {app}",
+    "@addedApp": {
+        "placeholders": {
+            "app": {}
+        }
+    },
+    "couldNotDetermineTopApp": "Could not determine top app",
+    "genericError": "Error: {error}",
+    "@genericError": {
+        "placeholders": {
+            "error": {}
+        }
+    },
+    "manualEditsHint": "Manual edits here will be used for the next recording."
 }
