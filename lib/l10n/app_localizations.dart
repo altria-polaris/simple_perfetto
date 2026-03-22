@@ -461,6 +461,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manual edits here will be used for the next recording.'**
   String get manualEditsHint;
+
+  /// No description provided for @goToSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Settings'**
+  String get goToSettings;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

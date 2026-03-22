@@ -9,7 +9,32 @@ import 'main.dart';
 
 // Todo: replace this with your actual Windows shared folder path
 const String _kUpdateUrl =
-    r'D:\workspace\updater'; // or shared path like r'\\server\share\updates
+    r'D:\workspace\simple_perfetto\test_update'; // Test update directory
+
+Future<Map<String, dynamic>?> checkUpdateSilent() async {
+  try {
+    if (_kUpdateUrl.isEmpty) return null;
+    final versionFile =
+        File('$_kUpdateUrl${Platform.pathSeparator}version.json');
+    if (!await versionFile.exists()) return null;
+
+    final versionContent = await versionFile.readAsString();
+    final versionInfo = jsonDecode(versionContent);
+
+    final newVersion = versionInfo['version'];
+    final newBuild = versionInfo['build'];
+    final newVersionString = 'v$newVersion+$newBuild';
+
+    final packageInfo = await PackageInfo.fromPlatform();
+    final currentVersionString =
+        'v${packageInfo.version}+${packageInfo.buildNumber}';
+
+    if (newVersionString != currentVersionString) {
+      return versionInfo;
+    }
+  } catch (_) {}
+  return null;
+}
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -338,12 +363,43 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
       if (!mounted) return;
 
       if (newVersionString != currentVersionString) {
+        final changesList = versionInfo['changes'] as List<dynamic>?;
+        Widget? changesWidget;
+        if (changesList != null && changesList.isNotEmpty) {
+          changesWidget = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              const Text("What's New:",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              ...changesList.map((c) => Text('• $c')),
+            ],
+          );
+        }
+
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: Text(l10n.updateAvailable),
-            content: Text(
-                'New version $newVersionString is available. Current version is $currentVersionString.'),
+            content: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: MediaQuery.of(context).size.width * 0.75,
+                maxHeight: MediaQuery.of(context).size.height * 0.75,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                        'New version $newVersionString is available.\nCurrent version is $currentVersionString.'),
+                    if (changesWidget != null) changesWidget,
+                  ],
+                ),
+              ),
+            ),
             actions: [
               TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
@@ -359,7 +415,10 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
           await _downloadAndInstallUpdate(versionInfo);
         }
       } else {
-        messenger.showSnackBar(SnackBar(content: Text(l10n.upToDate)));
+        messenger.showSnackBar(SnackBar(
+          content: Text(l10n.upToDate),
+          duration: const Duration(seconds: 1),
+        ));
       }
     } catch (e) {
       if (mounted) {
@@ -456,6 +515,8 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
         final scriptContent = """
 @echo off
 setlocal
+echo Update in progress. Please do not turn off this console window...
+echo.
 echo Waiting for application (PID: $currentPid) to close...
 :waitloop
 tasklist /FI "PID eq $currentPid" | find "$currentPid" > nul
@@ -466,6 +527,8 @@ if not errorlevel 1 (
 
 echo Application closed.
 timeout /t 2 /nobreak > nul
+echo Start to Update. Please do not turn off this console window...
+echo.
 echo Replacing application files...
 robocopy "$extractPath" "$installPath" /E /IS /IT /NFL /NDL /NJH /NJS /nc /ns /np /R:10 /W:1
 if errorlevel 8 (

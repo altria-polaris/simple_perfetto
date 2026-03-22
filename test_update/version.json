@@ -1,0 +1,11 @@
+{
+  "version": "9.9.9",
+  "build": "999",
+  "path": "update.zip",
+  "changes": [
+    "Improved background update checking.",
+    "Added localized update notification tip.",
+    "Fixed explorer file path space handling.",
+    "Added update warning message."
+  ]
+}

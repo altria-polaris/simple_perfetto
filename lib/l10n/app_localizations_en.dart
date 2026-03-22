@@ -212,4 +212,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get manualEditsHint => 'Manual edits here will be used for the next recording.';
+
+  @override
+  String get goToSettings => 'Go to Settings';
 }

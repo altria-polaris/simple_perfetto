@@ -177,6 +177,75 @@ class _MainScreenState extends State<MainScreen> {
   _NavPage _selectedPage = _NavPage.record;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkBackgroundUpdate();
+    });
+  }
+
+  Future<void> _checkBackgroundUpdate() async {
+    final updateInfo = await checkUpdateSilent();
+    if (updateInfo != null && mounted) {
+      final l10n = AppLocalizations.of(context)!;
+      final changesList = updateInfo['changes'] as List<dynamic>?;
+      Widget? changesWidget;
+      if (changesList != null && changesList.isNotEmpty) {
+        changesWidget = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            const Text("What's New:",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            ...changesList.map((c) => Text('• $c')),
+          ],
+        );
+      }
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(l10n.updateAvailable),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: MediaQuery.of(context).size.width * 0.75,
+              maxHeight: MediaQuery.of(context).size.height * 0.75,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                      'New version v${updateInfo['version']}+${updateInfo['build']} is available.'),
+                  if (changesWidget != null) changesWidget,
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _selectedPage = _NavPage.settings;
+                });
+              },
+              child: Text(l10n.goToSettings),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final topNavPages = [_NavPage.record, _NavPage.callStack];

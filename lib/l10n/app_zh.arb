@@ -156,5 +156,6 @@
             "error": {}
         }
     },
-    "manualEditsHint": "此處的手動編輯將用於下一次錄製。"
+    "manualEditsHint": "此處手動編輯的配置將會被沿用到下次錄製。",
+    "goToSettings": "移動到設定"
 }

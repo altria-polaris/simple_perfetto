@@ -156,5 +156,6 @@
             "error": {}
         }
     },
-    "manualEditsHint": "Manual edits here will be used for the next recording."
+    "manualEditsHint": "Manual edits here will be used for the next recording.",
+    "goToSettings": "Go to Settings"
 }

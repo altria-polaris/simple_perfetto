@@ -211,7 +211,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get manualEditsHint => '此處的手動編輯將用於下一次錄製。';
+  String get manualEditsHint => '此處手動編輯的配置將會被沿用到下次錄製。';
+
+  @override
+  String get goToSettings => '移動到設定';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -421,5 +424,8 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
-  String get manualEditsHint => '此处的手动编辑将用于下一次录制。';
+  String get manualEditsHint => '此处手动编辑的配置将会被沿用到下次录制。';
+
+  @override
+  String get goToSettings => '移动到设置';
 }
