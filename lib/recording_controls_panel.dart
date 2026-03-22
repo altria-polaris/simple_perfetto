@@ -184,9 +184,8 @@ class RecordingControlsPanel extends StatelessWidget {
                 ),
                 Expanded(
                   child: Slider(
-                    value: currentStepIndex >= 0
-                        ? currentStepIndex.toDouble()
-                        : 0,
+                    value:
+                        currentStepIndex >= 0 ? currentStepIndex.toDouble() : 0,
                     min: 0,
                     max: (durationSteps.length - 1).toDouble(),
                     divisions: durationSteps.length - 1,
@@ -223,7 +222,7 @@ class RecordingControlsPanel extends StatelessWidget {
                 icon: autoGenerateFilename
                     ? const Icon(Icons.lock)
                     : const Icon(Icons.lock_open),
-                onPressed: onToggleAutoFilename,
+                onPressed: isRecording ? null : onToggleAutoFilename,
                 tooltip: autoGenerateFilename
                     ? 'Unlock to edit'
                     : 'Lock to auto-generate',
@@ -265,9 +264,10 @@ class RecordingControlsPanel extends StatelessWidget {
                         icon: autoBufferSize
                             ? const Icon(Icons.auto_fix_normal)
                             : const Icon(Icons.auto_fix_off),
-                        onPressed: onToggleAutoBuffer,
-                        tooltip:
-                            autoBufferSize ? 'Unlock' : 'Lock to auto-calculate',
+                        onPressed: isRecording ? null : onToggleAutoBuffer,
+                        tooltip: autoBufferSize
+                            ? 'Unlock'
+                            : 'Lock to auto-calculate',
                       ),
                     ),
                   ),
@@ -284,7 +284,7 @@ class RecordingControlsPanel extends StatelessWidget {
                         fontSize: 13,
                       ),
                     ),
-                    onPressed: onOpenExplorer,
+                    onPressed: isRecording ? null : onOpenExplorer,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -299,7 +299,7 @@ class RecordingControlsPanel extends StatelessWidget {
                         fontSize: 13,
                       ),
                     ),
-                    onPressed: onOpenPerfetto,
+                    onPressed: isRecording ? null : onOpenPerfetto,
                   ),
                 ),
               ],

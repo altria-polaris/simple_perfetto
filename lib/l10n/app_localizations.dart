@@ -147,7 +147,7 @@ abstract class AppLocalizations {
   /// No description provided for @callStack.
   ///
   /// In en, this message translates to:
-  /// **'Call Stack'**
+  /// **'CallStack'**
   String get callStack;
 
   /// No description provided for @convert.

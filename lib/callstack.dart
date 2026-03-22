@@ -3,8 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'l10n/app_localizations.dart';
+
 import 'recording_controls_panel.dart';
+import 'target_app_input.dart';
 
 class CallStackScreen extends StatefulWidget {
   const CallStackScreen({super.key});
@@ -29,7 +30,6 @@ class _CallStackScreenState extends State<CallStackScreen> {
 
   // Duration steps for the slider
   final List<int> _durationSteps = [
-    5000,
     10000,
     15000,
     30000,
@@ -37,6 +37,9 @@ class _CallStackScreenState extends State<CallStackScreen> {
     180000,
     300000,
     600000,
+    900000,
+    1800000,
+    3600000
   ];
 
   // ADB Devices
@@ -392,15 +395,15 @@ data_sources: {
         ),
         content: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(ctx).size.height * 0.7,
-            maxWidth: 500,
+            minWidth: MediaQuery.of(ctx).size.width * 0.8,
+            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
                 'Manual edits here will be used for the next recording.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: TextStyle(fontSize: 12, color: Colors.black87),
               ),
               const SizedBox(height: 12),
               Expanded(
@@ -449,11 +452,10 @@ data_sources: {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
         forceMaterialTransparency: true,
-        title: Text(l10n.callStack),
+        title: const Text('Callstack Sampling'),
         actions: AdbDeviceSelector.asActions(
           devices: _adbDevices,
           selectedDevice: _selectedDevice,
@@ -506,16 +508,13 @@ data_sources: {
                 children: [
                   _buildSectionTitle('Sampling Settings'),
                   const SizedBox(height: 12),
-                  TextField(
+                  TargetAppInput(
                     controller: _targetProcessController,
-                    style: const TextStyle(fontSize: 13),
-                    decoration: const InputDecoration(
-                      labelText: 'Target Process (Cmdline)',
-                      hintText: 'e.g. com.android.settings',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.search, size: 18),
-                      isDense: true,
-                    ),
+                    labelText: "Target APP Names",
+                    hintText: "e.g. com.android.launcher3, surfaceflinger",
+                    prefixIcon: Icons.apps,
+                    selectedDevice: _selectedDevice,
+                    onMessage: _updateStatus,
                   ),
                   const SizedBox(height: 12),
                   TextField(

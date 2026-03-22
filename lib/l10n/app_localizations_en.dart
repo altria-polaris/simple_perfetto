@@ -33,7 +33,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get record => 'Record';
 
   @override
-  String get callStack => 'Call Stack';
+  String get callStack => 'CallStack';
 
   @override
   String get convert => 'Convert';

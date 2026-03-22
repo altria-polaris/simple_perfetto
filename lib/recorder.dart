@@ -4,8 +4,9 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'l10n/app_localizations.dart';
+
 import 'recording_controls_panel.dart';
+import 'target_app_input.dart';
 
 /// Describes an adb shell command to run in the background during recording.
 /// [shellCommand] is executed as `adb shell <shellCommand>`.
@@ -679,6 +680,7 @@ data_sources: {
         ),
         content: ConstrainedBox(
           constraints: BoxConstraints(
+            minWidth: MediaQuery.of(ctx).size.width * 0.8,
             maxHeight: MediaQuery.of(ctx).size.height * 0.8,
           ),
           child: SizedBox(
@@ -778,47 +780,6 @@ data_sources: {
     );
   }
 
-  Future<void> _fetchTopApp() async {
-    final deviceArgs =
-        _selectedDevice != null ? ['-s', _selectedDevice!] : <String>[];
-    _updateStatus('Fetching top app...');
-    try {
-      final result =
-          await Process.run('adb', [...deviceArgs, 'shell', 'dumpsys window']);
-      final out = result.stdout.toString();
-      final lines = out.split('\n');
-      String? topPkg;
-
-      // Look for mCurrentFocus=Window{... u0 com.package.name/ActivityName}
-      final focusRegExp = RegExp(r'mCurrentFocus=.*?\s+([a-zA-Z0-9_.-]+)/');
-
-      for (final line in lines) {
-        if (line.contains('mCurrentFocus=')) {
-          final match = focusRegExp.firstMatch(line);
-          if (match != null && match.group(1) != 'null') {
-            topPkg = match.group(1);
-            break; // mCurrentFocus is the most accurate
-          }
-        }
-      }
-
-      if (topPkg != null) {
-        setState(() {
-          if (_appNameController.text.isEmpty) {
-            _appNameController.text = topPkg!;
-          } else if (!_appNameController.text.contains(topPkg!)) {
-            _appNameController.text += ', $topPkg';
-          }
-        });
-        _updateStatus('Added $topPkg');
-      } else {
-        _updateStatus('Could not determine top app');
-      }
-    } catch (e) {
-      _updateStatus('Error: $e');
-    }
-  }
-
   @override
   void dispose() {
     _timer?.cancel();
@@ -833,11 +794,10 @@ data_sources: {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
         forceMaterialTransparency: true,
-        title: Text(l10n.appTitle),
+        title: const Text('Perfetto UI Recorder'),
         actions: AdbDeviceSelector.asActions(
           devices: _adbDevices,
           selectedDevice: _selectedDevice,
@@ -992,6 +952,17 @@ data_sources: {
                   ),
                   const SizedBox(height: 16),
 
+                  // App Name Input
+                  TargetAppInput(
+                    controller: _appNameController,
+                    labelText: "Target APP Names",
+                    hintText: "e.g. com.android.launcher3, surfaceflinger",
+                    prefixIcon: Icons.apps,
+                    selectedDevice: _selectedDevice,
+                    onMessage: _updateStatus,
+                  ),
+                  const Spacer(),
+
                   // Atrace Input
                   TextField(
                     controller: _atraceController,
@@ -1017,41 +988,6 @@ data_sources: {
                       floatingLabelBehavior: FloatingLabelBehavior.always,
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.category_outlined),
-                      isDense: true,
-                    ),
-                  ),
-                  const Spacer(),
-
-                  // App Name Input
-                  TextField(
-                    controller: _appNameController,
-                    style: const TextStyle(fontSize: 12),
-                    decoration: InputDecoration(
-                      labelText: "APP Package names",
-                      hintText: "e.g. com.android.launcher3",
-                      floatingLabelBehavior: FloatingLabelBehavior.always,
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.apps),
-                      suffixIcon: Tooltip(
-                        message: "Get foreground app name",
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(4),
-                          onTap: _fetchTopApp,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: const [
-                                Icon(Icons.add_to_home_screen, size: 16),
-                                SizedBox(width: 4),
-                                Text("Get Top App",
-                                    style: TextStyle(fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
                       isDense: true,
                     ),
                   ),

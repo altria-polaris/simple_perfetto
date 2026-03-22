@@ -16,7 +16,7 @@
     "@resetToDefaults": {},
     "record": "Record",
     "@record": {},
-    "callStack": "Call Stack",
+    "callStack": "CallStack",
     "@callStack": {},
     "convert": "Convert",
     "@convert": {},
