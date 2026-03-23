@@ -467,6 +467,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Go to Settings'**
   String get goToSettings;
+
+  /// No description provided for @downloadingUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading update...'**
+  String get downloadingUpdate;
+
+  /// No description provided for @extractingUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting update...'**
+  String get extractingUpdate;
+
+  /// No description provided for @readyToUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to update. Starting script...'**
+  String get readyToUpdate;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

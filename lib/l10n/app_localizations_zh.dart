@@ -215,6 +215,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get goToSettings => '移動到設定';
+
+  @override
+  String get downloadingUpdate => '下載更新中...';
+
+  @override
+  String get extractingUpdate => '解壓縮更新中...';
+
+  @override
+  String get readyToUpdate => '準備更新。啟動指令碼...';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -428,4 +437,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get goToSettings => '移动到设置';
+
+  @override
+  String get downloadingUpdate => '下载更新中...';
+
+  @override
+  String get extractingUpdate => '解压缩更新中...';
+
+  @override
+  String get readyToUpdate => '准备更新。启动脚本...';
 }

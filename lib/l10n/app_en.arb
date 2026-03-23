@@ -157,5 +157,8 @@
         }
     },
     "manualEditsHint": "Manual edits here will be used for the next recording.",
-    "goToSettings": "Go to Settings"
+    "goToSettings": "Go to Settings",
+    "downloadingUpdate": "Downloading update...",
+    "extractingUpdate": "Extracting update...",
+    "readyToUpdate": "Ready to update. Starting script..."
 }

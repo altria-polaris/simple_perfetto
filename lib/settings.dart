@@ -11,6 +11,29 @@ import 'main.dart';
 const String _kUpdateUrl =
     r'D:\workspace\simple_perfetto\test_update'; // Test update directory
 
+bool _isNewerVersion(String newVersion, String newBuild, String currentVersion,
+    String currentBuild) {
+  List<int> parseVersion(String v) =>
+      v.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+
+  final newParts = parseVersion(newVersion);
+  final currParts = parseVersion(currentVersion);
+
+  final maxLength =
+      newParts.length > currParts.length ? newParts.length : currParts.length;
+
+  for (int i = 0; i < maxLength; i++) {
+    final n = i < newParts.length ? newParts[i] : 0;
+    final c = i < currParts.length ? currParts[i] : 0;
+    if (n > c) return true;
+    if (n < c) return false;
+  }
+
+  final nBuild = int.tryParse(newBuild) ?? 0;
+  final cBuild = int.tryParse(currentBuild) ?? 0;
+  return nBuild > cBuild;
+}
+
 Future<Map<String, dynamic>?> checkUpdateSilent() async {
   try {
     if (_kUpdateUrl.isEmpty) return null;
@@ -23,13 +46,11 @@ Future<Map<String, dynamic>?> checkUpdateSilent() async {
 
     final newVersion = versionInfo['version'];
     final newBuild = versionInfo['build'];
-    final newVersionString = 'v$newVersion+$newBuild';
 
     final packageInfo = await PackageInfo.fromPlatform();
-    final currentVersionString =
-        'v${packageInfo.version}+${packageInfo.buildNumber}';
 
-    if (newVersionString != currentVersionString) {
+    if (_isNewerVersion(
+        newVersion, newBuild, packageInfo.version, packageInfo.buildNumber)) {
       return versionInfo;
     }
   } catch (_) {}
@@ -308,8 +329,6 @@ class _UpdateSettingsCard extends StatefulWidget {
 
 class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
   bool _isCheckingForUpdate = false;
-  bool _isDownloading = false;
-  double _downloadProgress = 0.0;
   String _currentVersion = '';
 
   @override
@@ -362,7 +381,8 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
 
       if (!mounted) return;
 
-      if (newVersionString != currentVersionString) {
+      if (_isNewerVersion(
+          newVersion, newBuild, packageInfo.version, packageInfo.buildNumber)) {
         final changesList = versionInfo['changes'] as List<dynamic>?;
         Widget? changesWidget;
         if (changesList != null && changesList.isNotEmpty) {
@@ -379,41 +399,16 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
           );
         }
 
-        final confirmed = await showDialog<bool>(
+        await showDialog<void>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: Text(l10n.updateAvailable),
-            content: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: MediaQuery.of(context).size.width * 0.75,
-                maxHeight: MediaQuery.of(context).size.height * 0.75,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                        'New version $newVersionString is available.\nCurrent version is $currentVersionString.'),
-                    if (changesWidget != null) changesWidget,
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text(l10n.cancel)),
-              TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: Text(l10n.download)),
-            ],
+          barrierDismissible: false,
+          builder: (context) => _UpdateDialog(
+            versionInfo: versionInfo,
+            newVersionString: newVersionString,
+            currentVersionString: currentVersionString,
+            changesWidget: changesWidget,
           ),
         );
-
-        if (confirmed == true) {
-          await _downloadAndInstallUpdate(versionInfo);
-        }
       } else {
         messenger.showSnackBar(SnackBar(
           content: Text(l10n.upToDate),
@@ -432,30 +427,78 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
     }
   }
 
-  Future<void> _downloadAndInstallUpdate(
-      Map<String, dynamic> versionInfo) async {
-    if (!mounted) return;
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final messenger = ScaffoldMessenger.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            if (_currentVersion.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Text(
+                  '${l10n.version} $_currentVersion',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.update),
+              label: Text(l10n.checkForUpdates),
+              onPressed: _isCheckingForUpdate ? null : _checkForUpdates,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UpdateDialog extends StatefulWidget {
+  final Map<String, dynamic> versionInfo;
+  final String newVersionString;
+  final String currentVersionString;
+  final Widget? changesWidget;
+
+  const _UpdateDialog({
+    required this.versionInfo,
+    required this.newVersionString,
+    required this.currentVersionString,
+    this.changesWidget,
+  });
+
+  @override
+  State<_UpdateDialog> createState() => _UpdateDialogState();
+}
+
+class _UpdateDialogState extends State<_UpdateDialog> {
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0;
+  String _statusMessage = '';
+
+  Future<void> _downloadAndInstallUpdate() async {
+    final l10n = AppLocalizations.of(context)!;
     final updatePath = _kUpdateUrl;
 
     setState(() {
       _isDownloading = true;
       _downloadProgress = 0.0;
+      _statusMessage = l10n.downloadingUpdate;
     });
 
     try {
       final zipPath =
-          '$updatePath${Platform.pathSeparator}${versionInfo['path']}';
+          '$updatePath${Platform.pathSeparator}${widget.versionInfo['path']}';
       final zipFile = File(zipPath);
 
       if (!await zipFile.exists()) {
-        throw Exception('Update file not found: ${versionInfo['path']}');
+        throw Exception('Update file not found: ${widget.versionInfo['path']}');
       }
 
       final tempDir = await getTemporaryDirectory();
 
-      // Copy file locally to show progress, then unzip from local copy.
       final localZipFile =
           File('${tempDir.path}${Platform.pathSeparator}update.zip');
       if (await localZipFile.exists()) {
@@ -479,32 +522,36 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
       await sink.close();
 
       if (!mounted) return;
-      setState(() => _isDownloading = false);
+      setState(() {
+        _statusMessage = l10n.extractingUpdate;
+        _downloadProgress = -1.0;
+      });
 
       final extractPath = '${tempDir.path}${Platform.pathSeparator}update';
-      // Ensure the target directory is clean before extraction.
       final extractDir = Directory(extractPath);
       if (await extractDir.exists()) {
         await extractDir.delete(recursive: true);
       }
 
-      // Use the helper from archive_io to extract directly from the file.
-      // This is more memory-efficient and the code is cleaner.
       await extractFileToDisk(localZipFile.path, extractPath);
 
-      // Validate the update content to prevent breaking the installation.
-      // The zip file must contain the executable at the root level.
       final executableName =
           Platform.resolvedExecutable.split(Platform.pathSeparator).last;
       final updateExe =
           File('$extractPath${Platform.pathSeparator}$executableName');
 
       if (!await updateExe.exists()) {
-        throw Exception(
-            'Invalid update package: $executableName not found. Please ensure you zipped the *files*, not the folder.');
+        throw Exception('Invalid update package: $executableName not found.');
       }
 
-      await localZipFile.delete(); // Clean up the copied zip
+      await localZipFile.delete();
+
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = l10n.readyToUpdate;
+        _downloadProgress = 1.0;
+      });
+      await Future.delayed(const Duration(seconds: 1));
 
       if (!mounted) return;
 
@@ -514,67 +561,68 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
 
         final scriptContent = """
 @echo off
+chcp 65001 > nul
 setlocal
 echo Update in progress. Please do not turn off this console window...
+echo 更新進行中。請勿關閉此主控台視窗...
 echo.
 echo Waiting for application (PID: $currentPid) to close...
+echo 等待應用程式 (PID: $currentPid) 關閉...
+
 :waitloop
 tasklist /FI "PID eq $currentPid" | find "$currentPid" > nul
 if not errorlevel 1 (
-    timeout /t 1 /nobreak > nul
+    timeout /t 3 /nobreak > nul
+    taskkill /F /PID $currentPid > nul 2>&1
     goto waitloop
 )
 
+echo.
 echo Application closed.
-timeout /t 2 /nobreak > nul
+echo 應用程式已關閉。
+timeout /t 1 /nobreak > nul
+echo.
 echo Start to Update. Please do not turn off this console window...
+echo 開始更新。請勿關閉此主控台視窗...
 echo.
 echo Replacing application files...
+echo 正在替換應用程式檔案...
 robocopy "$extractPath" "$installPath" /E /IS /IT /NFL /NDL /NJH /NJS /nc /ns /np /R:10 /W:1
 if errorlevel 8 (
   echo Robocopy failed with error code %errorlevel%. Halting update.
+  echo Robocopy 失敗，錯誤代碼 %errorlevel%。停止更新。
   pause
   exit /b %errorlevel%
 )
 
 echo Relaunching application...
+echo 正在重新啟動應用程式...
 timeout /t 2 /nobreak > nul
 explorer.exe "$installPath\\$executableName"
+echo.
 
 echo Cleaning up...
+echo 正在清理...
 rmdir /S /Q "$extractPath"
-echo Update complete. Press any key to close this window.
+echo Update complete.
+echo 更新完成。
+echo Press wait App relaunch and press any key to close this window.
+echo 請稍等應用程式重新啟動後按任意鍵關閉此視窗。
 (goto) 2>nul & del "%~f0" & pause & exit
 """;
         final scriptFile = File('${tempDir.path}\\update.bat');
-        await scriptFile.writeAsString(scriptContent);
-
-        // Use Process.start in detached mode to launch the update script
-        // in a separate process and not wait for it. This allows the main
-        // app to exit immediately.
-        await Process.start('cmd', ['/c', 'start', '""', scriptFile.path],
-            runInShell: true, mode: ProcessStartMode.detached);
+        await scriptFile.writeAsString(
+            scriptContent.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n'));
+        await Process.run('cmd', ['/c', 'start', scriptFile.path],
+            runInShell: true);
         exit(0);
-      } else {
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(l10n.installAndRestart),
-            content: Text(
-                'Update has been prepared. Please close the app, replace files from "$updatePath", and restart.'),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK')),
-            ],
-          ),
-        );
       }
     } catch (e) {
       if (mounted) {
-        messenger.showSnackBar(
-            SnackBar(content: Text('Failed to perform update: $e')));
-        setState(() => _isDownloading = false);
+        setState(() {
+          _isDownloading = false;
+          _statusMessage = 'Failed to perform update: $e';
+        });
       }
     }
   }
@@ -582,40 +630,62 @@ echo Update complete. Press any key to close this window.
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            if (_currentVersion.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: Text(
-                  '${l10n.version} $_currentVersion',
-                  style: Theme.of(context).textTheme.titleMedium,
+    return AlertDialog(
+      title: Text(l10n.updateAvailable),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          minWidth: MediaQuery.of(context).size.width * 0.75,
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                  'New version ${widget.newVersionString} is available.\nCurrent version is ${widget.currentVersionString}.'),
+              if (widget.changesWidget != null) widget.changesWidget!,
+              if (_isDownloading || _statusMessage.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_statusMessage,
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      if (_isDownloading) ...[
+                        const SizedBox(height: 8),
+                        if (_downloadProgress >= 0.0)
+                          LinearProgressIndicator(value: _downloadProgress)
+                        else
+                          const LinearProgressIndicator(),
+                        if (_downloadProgress >= 0.0 && _downloadProgress < 1.0)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(
+                                '${(_downloadProgress * 100).toStringAsFixed(0)}%'),
+                          ),
+                      ]
+                    ],
+                  ),
                 ),
-              ),
-            if (_isDownloading)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: Column(
-                  children: [
-                    LinearProgressIndicator(value: _downloadProgress),
-                    const SizedBox(height: 4),
-                    Text('${(_downloadProgress * 100).toStringAsFixed(0)}%'),
-                  ],
-                ),
-              )
-            else
-              ElevatedButton.icon(
-                icon: const Icon(Icons.update),
-                label: Text(l10n.checkForUpdates),
-                onPressed: _isCheckingForUpdate ? null : _checkForUpdates,
-              ),
-          ],
+            ],
+          ),
         ),
       ),
+      actions: [
+        if (!_isDownloading) ...[
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(l10n.cancel)),
+          TextButton(
+              onPressed: _downloadAndInstallUpdate, child: Text(l10n.download)),
+        ] else ...[
+          TextButton(
+              onPressed: null,
+              child: Text(l10n.download)), // Disabled while downloading
+        ]
+      ],
     );
   }
 }

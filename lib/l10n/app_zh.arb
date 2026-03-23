@@ -157,5 +157,8 @@
         }
     },
     "manualEditsHint": "此處手動編輯的配置將會被沿用到下次錄製。",
-    "goToSettings": "移動到設定"
+    "goToSettings": "移動到設定",
+    "downloadingUpdate": "下載更新中...",
+    "extractingUpdate": "解壓縮更新中...",
+    "readyToUpdate": "準備更新。啟動指令碼..."
 }

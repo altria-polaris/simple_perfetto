@@ -215,4 +215,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get goToSettings => 'Go to Settings';
+
+  @override
+  String get downloadingUpdate => 'Downloading update...';
+
+  @override
+  String get extractingUpdate => 'Extracting update...';
+
+  @override
+  String get readyToUpdate => 'Ready to update. Starting script...';
 }
