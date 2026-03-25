@@ -478,7 +478,7 @@ data_sources: {
                       isDense: true,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   // Config Dialog Trigger (Similar to Active Categories in Recorder)
                   InkWell(

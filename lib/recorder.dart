@@ -288,7 +288,31 @@ class _RecorderScreenState extends State<RecorderScreen> {
   /// All ftrace events
   Set<String> _getFtraceEvents() {
     final fromUser = _getUserTokens(_ftraceController).toSet();
-    return {..._defaultFtraceEvents, ...fromUser};
+    final allEvents = <String>{..._defaultFtraceEvents, ...fromUser};
+
+    final wildcards = allEvents
+        .where((e) => e.endsWith('/*'))
+        .map((e) => e.substring(0, e.length - 1)) // e.g. "power/"
+        .toList();
+
+    if (wildcards.isEmpty) return allEvents;
+
+    final filtered = <String>{};
+    for (final event in allEvents) {
+      if (event.endsWith('/*')) {
+        filtered.add(event);
+      } else {
+        bool isCovered = false;
+        for (final wc in wildcards) {
+          if (event.startsWith(wc)) {
+            isCovered = true;
+            break;
+          }
+        }
+        if (!isCovered) filtered.add(event);
+      }
+    }
+    return filtered;
   }
 
   /// All atrace apps from _appNameController (space-separated)
@@ -787,7 +811,7 @@ data_sources: {
           // Bottom Section: Settings (Scrollable)
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
