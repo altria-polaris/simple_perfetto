@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'package:flutter/material.dart';
 
 import 'recording_controls_panel.dart';
 import 'target_app_input.dart';
+import 'trace_utils.dart';
 import 'l10n/app_localizations.dart';
 
 class CallStackScreen extends StatefulWidget {
@@ -94,14 +93,10 @@ class _CallStackScreenState extends State<CallStackScreen> {
   // --- Helper Methods (Similar to Recorder) ---
 
   void _generateNewFilename() {
-    final now = DateTime.now();
-    final random = Random();
-    final hex =
-        random.nextInt(0x10000).toRadixString(16).toLowerCase().padLeft(4, '0');
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final fileName =
-        'callstack_${now.year}-${twoDigits(now.month)}-${twoDigits(now.day)}_${twoDigits(now.hour)}-${twoDigits(now.minute)}_$hex.pftrace';
-    _outputFileController.text = fileName;
+    TraceUtils.generateNewFilename(
+      prefix: 'callstack',
+      controller: _outputFileController,
+    );
   }
 
   void _updateBufferSize() {
@@ -125,33 +120,23 @@ class _CallStackScreenState extends State<CallStackScreen> {
   }
 
   Future<void> _refreshAdbDevices() async {
-    try {
-      final result = await Process.run('adb', ['devices']);
-      if (result.exitCode == 0) {
-        final lines = LineSplitter.split(result.stdout as String).toList();
-        final devices = <String>[];
-        for (var i = 1; i < lines.length; i++) {
-          final line = lines[i].trim();
-          if (line.isNotEmpty) {
-            final parts = line.split(RegExp(r'\s+'));
-            if (parts.length >= 2 && parts[1] == 'device') {
-              devices.add(parts[0]);
-            }
-          }
+    await TraceUtils.refreshAdbDevices(
+      currentDevice: _selectedDevice,
+      onSuccess: (devices, selectedDevice) {
+        if (mounted) {
+          setState(() {
+            _adbDevices = devices;
+            _selectedDevice = selectedDevice;
+          });
         }
-        setState(() {
-          _adbDevices = devices;
-          if (_selectedDevice == null ||
-              !_adbDevices.contains(_selectedDevice)) {
-            _selectedDevice = _adbDevices.isNotEmpty ? _adbDevices.first : null;
-          }
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      final l10n = AppLocalizations.of(context)!;
-      _updateStatus(l10n.errorGettingDevices(e.toString()));
-    }
+      },
+      onError: (error) {
+        if (mounted) {
+          final l10n = AppLocalizations.of(context)!;
+          _updateStatus(l10n.errorGettingDevices(error));
+        }
+      },
+    );
   }
 
   void _updateStatus(String message,
@@ -303,80 +288,31 @@ data_sources: {
     _lockButton();
     if (_recordingProcess != null) {
       _userStopped = true;
+      if (!mounted) return;
       _updateStatus(AppLocalizations.of(context)!.stoppingManually,
           duration: const Duration(seconds: 1));
-      final deviceArgs =
-          _selectedDevice != null ? ['-s', _selectedDevice!] : [];
-      await Process.run(
-          'adb', [...deviceArgs, 'shell', 'killall', '-2', 'perfetto']);
+      await TraceUtils.stopPerfetto(_selectedDevice);
     }
   }
 
   Future<void> _pullTraceFile(String traceName) async {
-    try {
-      final tracesDir = Directory('${Directory.current.path}\\Traces');
-      if (!await tracesDir.exists()) await tracesDir.create(recursive: true);
-      final localPath = '${tracesDir.path}\\$traceName';
-
-      final deviceArgs =
-          _selectedDevice != null ? ['-s', _selectedDevice!] : [];
-      final result = await Process.run('adb', [
-        ...deviceArgs,
-        'pull',
-        '/data/misc/perfetto-traces/$traceName',
-        localPath
-      ]);
-      if (!mounted) return;
-      final l10n = AppLocalizations.of(context)!;
-      if (result.exitCode == 0) {
-        _updateStatus(l10n.successSavedTo(localPath));
-      } else {
-        _updateStatus(l10n.pullFailed(result.stderr.toString()));
-      }
-    } catch (e) {
-      if (!mounted) return;
-      _updateStatus(
-          AppLocalizations.of(context)!.errorPullingFile(e.toString()));
-    }
+    await TraceUtils.pullTraceFile(
+      context: context,
+      traceName: traceName,
+      selectedDevice: _selectedDevice,
+      updateStatus: _updateStatus,
+    );
   }
 
   Future<void> _openTraceInBrowser() async {
-    final fileName = _outputFileController.text;
-    final tracesDir = Directory('${Directory.current.path}\\Traces');
-    final filePath = '${tracesDir.path}\\$fileName';
-    if (!mounted) return;
-    final l10n = AppLocalizations.of(context)!;
-
-    if (!File(filePath).existsSync()) {
-      _updateStatus(l10n.fileNotFound(fileName));
-      return;
-    }
-
-    await _server?.close(force: true);
-
-    try {
-      _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 9001);
-      _server!.listen((HttpRequest request) async {
-        request.response.headers
-            .add('Access-Control-Allow-Origin', 'https://ui.perfetto.dev');
-        final encodedName = Uri.encodeComponent(fileName);
-        if (request.uri.path == '/$encodedName') {
-          final file = File(filePath);
-          await file.openRead().pipe(request.response);
-        } else {
-          request.response.statusCode = HttpStatus.notFound;
-          request.response.close();
-        }
-      });
-
-      final encodedName = Uri.encodeComponent(fileName);
-      final url =
-          'https://ui.perfetto.dev/#!/?url=http://127.0.0.1:9001/$encodedName&referrer=record_android_trace';
-
-      Process.run('cmd', ['/c', 'start', url]);
-      _updateStatus(l10n.servingTrace);
-    } catch (e) {
-      _updateStatus(l10n.errorStartingServer(e.toString()));
+    final newServer = await TraceUtils.openTraceInBrowser(
+      context: context,
+      fileName: _outputFileController.text,
+      existingServer: _server,
+      updateStatus: _updateStatus,
+    );
+    if (newServer != null) {
+      _server = newServer;
     }
   }
 
