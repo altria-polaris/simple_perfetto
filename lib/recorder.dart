@@ -55,6 +55,7 @@ class _RecorderScreenState extends State<RecorderScreen> {
   double _durationMs = 10000;
   bool _autoBufferSize = true;
   bool _isButtonLocked = false;
+  bool _isProcessing = false;
 
   // Duration steps for the slider
   final List<int> _durationSteps = [
@@ -510,6 +511,7 @@ data_sources: {
     setState(() {
       _isRecording = true;
       _userStopped = false;
+      _isProcessing = false;
       if (_autoGenerateFilename) {
         _generateNewFilename();
       }
@@ -594,12 +596,14 @@ data_sources: {
 
   // Pull Trace File from Device
   Future<void> _pullTraceFile(String traceName) async {
+    setState(() => _isProcessing = true);
     await TraceUtils.pullTraceFile(
       context: context,
       traceName: traceName,
       selectedDevice: _selectedDevice,
       updateStatus: _updateStatus,
     );
+    if (mounted) setState(() => _isProcessing = false);
   }
 
   Future<void> _openTraceInBrowser() async {
@@ -803,6 +807,7 @@ data_sources: {
               await openExplorer(filePath, tracesDir);
             },
             onOpenPerfetto: _openTraceInBrowser,
+            isProcessing: _isProcessing,
             sliderLabel: _formatDuration,
           ),
 

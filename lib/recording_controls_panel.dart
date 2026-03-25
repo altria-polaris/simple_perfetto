@@ -32,6 +32,7 @@ class RecordingControlsPanel extends StatelessWidget {
     required this.onStop,
     required this.onOpenExplorer,
     required this.onOpenPerfetto,
+    this.isProcessing = false,
     this.formatTimer,
     this.sliderLabel,
   });
@@ -66,6 +67,7 @@ class RecordingControlsPanel extends StatelessWidget {
   // ── Action Buttons ────────────────────────────────────────────────────────
   final VoidCallback onOpenExplorer;
   final VoidCallback onOpenPerfetto;
+  final bool isProcessing;
 
   // ── Optional overrides ────────────────────────────────────────────────────
   /// Override the timer display format. Defaults to `mm:ss.d`.
@@ -286,7 +288,7 @@ class RecordingControlsPanel extends StatelessWidget {
                         fontSize: 13,
                       ),
                     ),
-                    onPressed: isRecording ? null : onOpenExplorer,
+                    onPressed: (isRecording || isProcessing) ? null : onOpenExplorer,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -301,7 +303,7 @@ class RecordingControlsPanel extends StatelessWidget {
                         fontSize: 13,
                       ),
                     ),
-                    onPressed: isRecording ? null : onOpenPerfetto,
+                    onPressed: (isRecording || isProcessing) ? null : onOpenPerfetto,
                   ),
                 ),
               ],

@@ -27,6 +27,7 @@ class _CallStackScreenState extends State<CallStackScreen> {
   bool _autoGenerateFilename = true;
   bool _autoBufferSize = true;
   bool _isButtonLocked = false;
+  bool _isProcessing = false;
 
   // Duration steps for the slider
   final List<int> _durationSteps = [
@@ -230,6 +231,7 @@ data_sources: {
     setState(() {
       _isRecording = true;
       _userStopped = false;
+      _isProcessing = false;
       if (_autoGenerateFilename) _generateNewFilename();
     });
     _updateStatus(l10n.startingCallstack);
@@ -272,7 +274,9 @@ data_sources: {
 
       if (exitCode == 0 || _userStopped) {
         _updateStatus(l10n.recordingFinishedPulling);
+        setState(() => _isProcessing = true);
         await _pullTraceFile(outputFile);
+        if (mounted) setState(() => _isProcessing = false);
       } else {
         _updateStatus(l10n.perfettoError(exitCode.toString()));
       }
@@ -450,6 +454,7 @@ data_sources: {
               await openExplorer(filePath, tracesDir);
             },
             onOpenPerfetto: _openTraceInBrowser,
+            isProcessing: _isProcessing,
           ),
           const Divider(height: 1),
 
