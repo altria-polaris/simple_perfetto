@@ -8,6 +8,7 @@ class TargetAppInput extends StatelessWidget {
   final IconData prefixIcon;
   final String? selectedDevice;
   final void Function(String)? onMessage;
+  final String? errorText;
 
   const TargetAppInput({
     super.key,
@@ -17,6 +18,7 @@ class TargetAppInput extends StatelessWidget {
     this.prefixIcon = Icons.search,
     this.selectedDevice,
     this.onMessage,
+    this.errorText,
   });
 
   Future<void> _fetchTopApp() async {
@@ -65,6 +67,7 @@ class TargetAppInput extends StatelessWidget {
       decoration: InputDecoration(
         labelText: labelText,
         hintText: hintText,
+        errorText: errorText,
         floatingLabelBehavior: FloatingLabelBehavior.always,
         border: const OutlineInputBorder(),
         prefixIcon: Icon(prefixIcon, size: 18),

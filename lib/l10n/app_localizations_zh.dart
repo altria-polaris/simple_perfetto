@@ -224,6 +224,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readyToUpdate => '準備更新。啟動指令碼...';
+
+  @override
+  String get targetAppNamesRequired => 'Target APP Names 不能為空';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -446,4 +449,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get readyToUpdate => '准备更新。启动脚本...';
+
+  @override
+  String get targetAppNamesRequired => 'Target APP Names 不能为空';
 }

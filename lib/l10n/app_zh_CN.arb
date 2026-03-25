@@ -160,5 +160,6 @@
     "goToSettings": "移动到设置",
     "downloadingUpdate": "下载更新中...",
     "extractingUpdate": "解压缩更新中...",
-    "readyToUpdate": "准备更新。启动脚本..."
+    "readyToUpdate": "准备更新。启动脚本...",
+    "targetAppNamesRequired": "Target APP Names 不能为空"
 }

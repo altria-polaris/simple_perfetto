@@ -160,5 +160,6 @@
     "goToSettings": "Go to Settings",
     "downloadingUpdate": "Downloading update...",
     "extractingUpdate": "Extracting update...",
-    "readyToUpdate": "Ready to update. Starting script..."
+    "readyToUpdate": "Ready to update. Starting script...",
+    "targetAppNamesRequired": "Target APP Names is required for callstack sampling."
 }

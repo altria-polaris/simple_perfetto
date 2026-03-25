@@ -18,7 +18,7 @@ class _CallStackScreenState extends State<CallStackScreen> {
   // Config State
   double _durationMs = 10000;
   final TextEditingController _targetProcessController =
-      TextEditingController(text: 'com.android.settings');
+      TextEditingController();
   final TextEditingController _outputFileController = TextEditingController();
   final TextEditingController _bufferSizeController = TextEditingController();
   final TextEditingController _configController = TextEditingController();
@@ -219,8 +219,14 @@ data_sources: {
   Future<void> _startRecording() async {
     if (_isRecording) return;
 
-    _lockButton();
     final l10n = AppLocalizations.of(context)!;
+    if (_targetProcessController.text.trim().isEmpty) {
+      _updateStatus(l10n.targetAppNamesRequired);
+      return;
+    }
+
+    _lockButton();
+
     setState(() {
       _isRecording = true;
       _userStopped = false;
@@ -456,13 +462,20 @@ data_sources: {
                 children: [
                   _buildSectionTitle('Sampling Settings'),
                   const SizedBox(height: 12),
-                  TargetAppInput(
-                    controller: _targetProcessController,
-                    labelText: "Target APP Names",
-                    hintText: "e.g. com.android.launcher3, surfaceflinger",
-                    prefixIcon: Icons.apps,
-                    selectedDevice: _selectedDevice,
-                    onMessage: _updateStatus,
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _targetProcessController,
+                    builder: (context, value, _) {
+                      final l10n = AppLocalizations.of(context)!;
+                      final bool isEmpty = value.text.trim().isEmpty;
+                      return TargetAppInput(
+                        controller: _targetProcessController,
+                        labelText: "Target APP Names",
+                        hintText: "e.g. com.android.launcher3, surfaceflinger",
+                        errorText: isEmpty ? l10n.targetAppNamesRequired : null,
+                        prefixIcon: Icons.apps,
+                        selectedDevice: _selectedDevice,
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   TextField(

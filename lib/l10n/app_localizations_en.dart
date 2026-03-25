@@ -224,4 +224,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readyToUpdate => 'Ready to update. Starting script...';
+
+  @override
+  String get targetAppNamesRequired => 'Target APP Names is required for callstack sampling.';
 }

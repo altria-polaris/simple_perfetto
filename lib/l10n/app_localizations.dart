@@ -485,6 +485,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ready to update. Starting script...'**
   String get readyToUpdate;
+
+  /// No description provided for @targetAppNamesRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Target APP Names is required for callstack sampling.'**
+  String get targetAppNamesRequired;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -160,5 +160,6 @@
     "goToSettings": "移動到設定",
     "downloadingUpdate": "下載更新中...",
     "extractingUpdate": "解壓縮更新中...",
-    "readyToUpdate": "準備更新。啟動指令碼..."
+    "readyToUpdate": "準備更新。啟動指令碼...",
+    "targetAppNamesRequired": "Target APP Names 不能為空"
 }
