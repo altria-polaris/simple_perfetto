@@ -104,7 +104,7 @@ class _CallStackScreenState extends State<CallStackScreen> {
     if (_autoBufferSize) {
       final durationSec = _durationMs ~/ 1000;
       int sizeMb;
-      if (durationSec <= 15) {
+      if (durationSec <= 10) {
         sizeMb = 64;
       } else if (durationSec <= 30) {
         sizeMb = 128;
@@ -204,11 +204,13 @@ data_sources: {
   config: {
     name: "linux.ftrace"
     ftrace_config: {
-      ftrace_events: "sched/sched_switch"
-      ftrace_events: "sched/sched_waking"
-      atrace_categories: "dalvik"
+      atrace_categories: "sched"
+      atrace_categories: "freq"
+      atrace_categories: "idle"
       atrace_categories: "gfx"
-      atrace_categories: "view"
+      atrace_categories: "memory"
+      atrace_categories: "workq"
+      ftrace_events: "irq/*"
     }
   }
 }
