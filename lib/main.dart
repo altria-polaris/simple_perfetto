@@ -14,6 +14,7 @@ final ValueNotifier<ThemeMode> themeModeNotifier =
 final ValueNotifier<Color> colorSeedNotifier = ValueNotifier(Colors.blueGrey);
 final ValueNotifier<Locale?> localeNotifier = ValueNotifier(null);
 final ValueNotifier<String> updateUrlNotifier = ValueNotifier('');
+final ValueNotifier<bool> highlightUpdateNotifier = ValueNotifier(false);
 
 /// Normalize font weights to values actually supported by the CJK font.
 /// Microsoft JhengHei UI only has Regular (w400) and Bold (w700).
@@ -233,6 +234,7 @@ class _MainScreenState extends State<MainScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
+                highlightUpdateNotifier.value = true;
                 setState(() {
                   _selectedPage = _NavPage.settings;
                 });

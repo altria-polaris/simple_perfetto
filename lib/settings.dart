@@ -327,14 +327,33 @@ class _UpdateSettingsCard extends StatefulWidget {
   _UpdateSettingsCardState createState() => _UpdateSettingsCardState();
 }
 
-class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
+class _UpdateSettingsCardState extends State<_UpdateSettingsCard>
+    with SingleTickerProviderStateMixin {
   bool _isCheckingForUpdate = false;
   String _currentVersion = '';
+  late AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
     _initPackageInfo();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true, count: 5);
+
+    highlightUpdateNotifier.addListener(_onHighlightChanged);
+  }
+
+  void _onHighlightChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    highlightUpdateNotifier.removeListener(_onHighlightChanged);
+    _pulseController.dispose();
+    super.dispose();
   }
 
   Future<void> _initPackageInfo() async {
@@ -444,10 +463,44 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.update),
-              label: Text(l10n.checkForUpdates),
-              onPressed: _isCheckingForUpdate ? null : _checkForUpdates,
+            ValueListenableBuilder<bool>(
+              valueListenable: highlightUpdateNotifier,
+              builder: (context, shouldHighlight, child) {
+                if (!shouldHighlight) return child!;
+                return AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (context, child) {
+                    final value = _pulseController.value;
+                    return Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withAlpha((120 * value).toInt()),
+                            blurRadius: 15 * value,
+                            spreadRadius: 4 * value,
+                          ),
+                        ],
+                      ),
+                      child: child,
+                    );
+                  },
+                  child: child,
+                );
+              },
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.update),
+                label: Text(l10n.checkForUpdates),
+                onPressed: _isCheckingForUpdate
+                    ? null
+                    : () {
+                        highlightUpdateNotifier.value = false;
+                        _checkForUpdates();
+                      },
+              ),
             ),
           ],
         ),
