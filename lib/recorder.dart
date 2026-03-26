@@ -78,64 +78,58 @@ class _RecorderScreenState extends State<RecorderScreen> {
       description: 'Standard gfx + window-manager hooks',
       atraceCategories: ['gfx', 'input', 'view', 'wm', 'am'],
     ),
-    // RecordingMode(
-    //   label: 'Camera Tuning',
-    //   icon: Icons.camera_alt,
-    //   atraceCategories: [
-    //     'camera',
-    //     'hal',
-    //     'video',
-    //     'ion',
-    //     'gfx',
-    //     'sched',
-    //     'freq',
-    //     'idle'
-    //   ],
-    // ),
+
     RecordingMode(
       label: 'Graphic Memory',
       icon: Icons.videogame_asset,
       atraceCategories: ['gfx', 'sched', 'freq', 'idle'],
       // Example onStart/onStop Hooks for extra logging config or ADB action
-    ),
-    RecordingMode(
-      label: 'Kernel Events',
-      icon: Icons.developer_board,
-      atraceCategories: [
-        'sched',
-        'freq',
-        'idle',
-        'irq',
-        'workq',
-        'disk',
-        'sync'
-      ],
-    ),
-    RecordingMode(
-      label: 'Logcat',
-      icon: Icons.terminal,
-      description: 'Collect logcat output during recording',
-      backgroundCommand: BackgroundCommand(
-        shellCommand: 'logcat -v threadtime',
-        outputFileName: 'logcat.txt',
-      ),
+      onStart: (deviceId) async {
+        final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
+        await Process.run('adb', [
+          ...deviceArgs,
+          'shell',
+          'settings',
+          'put',
+          'system',
+          'show_touches',
+          '1'
+        ]);
+      },
+      onStop: (deviceId) async {
+        final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
+        await Process.run('adb', [
+          ...deviceArgs,
+          'shell',
+          'settings',
+          'put',
+          'system',
+          'show_touches',
+          '0'
+        ]);
+      },
     ),
     // RecordingMode(
-    //   label: 'Show Touches (Example)',
-    //   icon: Icons.touch_app,
-    //   description: 'ADB: enable touch dots during recording',
-    //   onStart: (deviceId) async {
-    //     final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
-    //     await Process.run('adb', [
-    //       ...deviceArgs, 'shell', 'settings', 'put', 'system', 'show_touches', '1'
-    //     ]);
-    //   },
-    //   onStop: (deviceId) async {
-    //     final deviceArgs = deviceId != null ? ['-s', deviceId] : [];
-    //     await Process.run('adb', [
-    //       ...deviceArgs, 'shell', 'settings', 'put', 'system', 'show_touches', '0'
-    //     ]);
-    //   },
+    //   label: 'Kernel Events',
+    //   icon: Icons.developer_board,
+    //   atraceCategories: [
+    //     'sched',
+    //     'freq',
+    //     'idle',
+    //     'irq',
+    //     'workq',
+    //     'disk',
+    //     'sync'
+    //   ],
+    // ),
+    // RecordingMode(
+    //   label: 'Logcat',
+    //   icon: Icons.terminal,
+    //   description: 'Collect logcat output during recording',
+    //   backgroundCommand: BackgroundCommand(
+    //     shellCommand: 'logcat -v threadtime',
+    //     outputFileName: 'logcat.txt',
+    //   ),
     // ),
   ];
 
@@ -258,13 +252,6 @@ class _RecorderScreenState extends State<RecorderScreen> {
     return _selectedModeLabels.contains(label);
   }
 
-  // Default ftrace events always included
-  static const List<String> _defaultFtraceEvents = [
-    'sched/sched_switch',
-    'power/suspend_resume',
-    'ftrace/print',
-  ];
-
   /// Parse user input from a given controller
   List<String> _getUserTokens(TextEditingController controller) {
     return controller.text
@@ -288,8 +275,14 @@ class _RecorderScreenState extends State<RecorderScreen> {
 
   /// All ftrace events
   Set<String> _getFtraceEvents() {
+    final fromModes = <String>{};
+    for (final mode in _recordingModes) {
+      if (_selectedModeLabels.contains(mode.label)) {
+        fromModes.addAll(mode.ftraceEvents);
+      }
+    }
     final fromUser = _getUserTokens(_ftraceController).toSet();
-    final allEvents = <String>{..._defaultFtraceEvents, ...fromUser};
+    final allEvents = <String>{...fromModes, ...fromUser};
 
     final wildcards = allEvents
         .where((e) => e.endsWith('/*'))
@@ -523,6 +516,13 @@ data_sources: {
 
     final deviceArgs = _selectedDevice != null ? ['-s', _selectedDevice!] : [];
     try {
+      // Call onStart hooks for selected modes
+      for (final mode in _recordingModes) {
+        if (_selectedModeLabels.contains(mode.label) && mode.onStart != null) {
+          await mode.onStart!(_selectedDevice);
+        }
+      }
+
       _recordingProcess = await Process.start(
         'adb',
         [
@@ -570,6 +570,14 @@ data_sources: {
       _updateStatus(l10n.errorStartingProcess(e.toString()));
     } finally {
       await _stopBackgroundCommands();
+
+      // Call onStop hooks for selected modes
+      for (final mode in _recordingModes) {
+        if (_selectedModeLabels.contains(mode.label) && mode.onStop != null) {
+          await mode.onStop!(_selectedDevice);
+        }
+      }
+
       if (mounted) {
         setState(() {
           _isRecording = false;
